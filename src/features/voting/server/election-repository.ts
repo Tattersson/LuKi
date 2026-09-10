@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
+import { ElectionNotDraftError } from "../domain/errors";
 import type {
   ElectionResults,
   ElectionSummary,
@@ -80,6 +81,65 @@ export async function getPublicElectionBySlug(
       description: c.description,
     })),
   };
+}
+
+/**
+ * Replaces title/description/closesAt and reconciles the candidate list (existing
+ * candidates matched by id are updated, ones omitted from the list are deleted, ones
+ * without an id are created). Only allowed while the election is still DRAFT - once
+ * it's open, deleting a candidate that already has votes would silently orphan them.
+ */
+export async function updateElection(params: {
+  id: string;
+  title: string;
+  description?: string;
+  closesAt?: Date;
+  candidates: Array<{ id?: string; name: string; description?: string }>;
+}) {
+  const { id, title, description, closesAt, candidates } = params;
+
+  await prisma.$transaction(async (tx) => {
+    const election = await tx.election.findUniqueOrThrow({
+      where: { id },
+      select: { status: true },
+    });
+    if (election.status !== "DRAFT") {
+      throw new ElectionNotDraftError();
+    }
+
+    await tx.election.update({
+      where: { id },
+      data: { title, description, closesAt: closesAt ?? null },
+    });
+
+    const existing = await tx.candidate.findMany({
+      where: { electionId: id },
+      select: { id: true },
+    });
+    const keepIds = new Set(candidates.filter((c) => c.id).map((c) => c.id!));
+    const idsToDelete = existing.map((c) => c.id).filter((id) => !keepIds.has(id));
+    if (idsToDelete.length > 0) {
+      await tx.candidate.deleteMany({ where: { id: { in: idsToDelete } } });
+    }
+
+    for (const [index, candidate] of candidates.entries()) {
+      if (candidate.id) {
+        await tx.candidate.update({
+          where: { id: candidate.id },
+          data: { name: candidate.name, description: candidate.description, sortOrder: index },
+        });
+      } else {
+        await tx.candidate.create({
+          data: {
+            electionId: id,
+            name: candidate.name,
+            description: candidate.description,
+            sortOrder: index,
+          },
+        });
+      }
+    }
+  });
 }
 
 /** Opens an election. Closing goes through election-lifecycle.ts's closeElectionAndNotify instead,

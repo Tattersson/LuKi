@@ -24,6 +24,12 @@ Admin login requires a real Keycloak issuer/client - set `KEYCLOAK_ISSUER`,
 on that client - Keycloak: Clients > your client > Roles - assigned to admin users'
 accounts) in `.env`.
 
+To work on the admin area without a working Keycloak connection, set
+`DEV_BYPASS_ADMIN_AUTH=true` in `.env` and restart `npm run dev`. `/admin` then treats
+you as an admin automatically - a yellow "DEV MODE" banner appears whenever this is
+active as a reminder. This only ever works outside production (`next start` /
+the Docker image both set `NODE_ENV=production`, which disables it unconditionally).
+
 ## Project structure
 
 - `src/features/voting/` - everything specific to the voting feature (OTP/vote

@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Keycloak from "next-auth/providers/keycloak";
+import { isAdminAuthBypassEnabled } from "./dev-bypass";
 
 export const authConfig: NextAuthConfig = {
   providers: [
@@ -49,6 +50,7 @@ export const authConfig: NextAuthConfig = {
     authorized({ auth, request }) {
       const isAdminPath = request.nextUrl.pathname.startsWith("/admin");
       if (!isAdminPath) return true;
+      if (isAdminAuthBypassEnabled()) return true;
       return !!auth?.user;
     },
   },

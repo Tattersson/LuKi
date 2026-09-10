@@ -54,3 +54,10 @@ export class InvalidBallotError extends Error {
     this.name = "InvalidBallotError";
   }
 }
+
+export class ElectionNotDraftError extends Error {
+  constructor() {
+    super("This election can only be edited while it's still a draft.");
+    this.name = "ElectionNotDraftError";
+  }
+}

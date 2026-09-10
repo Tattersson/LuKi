@@ -5,23 +5,40 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
-import { createElectionAction } from "../../server/actions";
+import { createElectionAction, updateElectionAction } from "../../server/actions";
 
-type CandidateInput = { name: string; description: string };
+type CandidateInput = { id?: string; name: string; description: string };
 
-export function ElectionForm() {
+export interface ElectionFormInitialData {
+  id: string;
+  title: string;
+  description: string | null;
+  closesAt: Date | null;
+  candidates: Array<{ id: string; name: string; description: string | null }>;
+}
+
+function toDatetimeLocalValue(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function ElectionForm({ election }: { election?: ElectionFormInitialData }) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [candidates, setCandidates] = useState<CandidateInput[]>([
-    { name: "", description: "" },
-    { name: "", description: "" },
-  ]);
-  const [closesAt, setClosesAt] = useState("");
+  const [title, setTitle] = useState(election?.title ?? "");
+  const [description, setDescription] = useState(election?.description ?? "");
+  const [candidates, setCandidates] = useState<CandidateInput[]>(
+    election?.candidates.map((c) => ({ id: c.id, name: c.name, description: c.description ?? "" })) ?? [
+      { name: "", description: "" },
+      { name: "", description: "" },
+    ],
+  );
+  const [closesAt, setClosesAt] = useState(
+    election?.closesAt ? toDatetimeLocalValue(election.closesAt) : "",
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function updateCandidate(index: number, field: keyof CandidateInput, value: string) {
+  function updateCandidate(index: number, field: "name" | "description", value: string) {
     setCandidates((current) =>
       current.map((c, i) => (i === index ? { ...c, [field]: value } : c)),
     );
@@ -40,14 +57,24 @@ export function ElectionForm() {
     setPending(true);
     setError(null);
 
-    const result = await createElectionAction({
-      title,
-      description: description || undefined,
-      closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
-      candidates: candidates
-        .filter((c) => c.name.trim())
-        .map((c) => ({ name: c.name, description: c.description || undefined })),
-    });
+    const candidatePayload = candidates
+      .filter((c) => c.name.trim())
+      .map((c) => ({ id: c.id, name: c.name, description: c.description || undefined }));
+
+    const result = election
+      ? await updateElectionAction({
+          electionId: election.id,
+          title,
+          description: description || undefined,
+          closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
+          candidates: candidatePayload,
+        })
+      : await createElectionAction({
+          title,
+          description: description || undefined,
+          closesAt: closesAt ? new Date(closesAt).toISOString() : undefined,
+          candidates: candidatePayload,
+        });
 
     setPending(false);
     if (!result.ok) {
@@ -90,7 +117,7 @@ export function ElectionForm() {
         </p>
         <div className="space-y-3">
           {candidates.map((candidate, index) => (
-            <div key={index} className="flex gap-2">
+            <div key={candidate.id ?? index} className="flex gap-2">
               <Input
                 required
                 value={candidate.name}
@@ -139,7 +166,7 @@ export function ElectionForm() {
       {error && <Alert variant="error">{error}</Alert>}
 
       <Button type="submit" disabled={pending}>
-        {pending ? "Creating..." : "Create election"}
+        {pending ? "Saving..." : election ? "Save changes" : "Create election"}
       </Button>
     </form>
   );

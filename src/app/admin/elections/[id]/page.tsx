@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   getElectionForAdmin,
@@ -34,7 +36,14 @@ export default async function ElectionDetailPage({
             <ElectionStatusBadge status={election.status} />
           </div>
         </div>
-        <OpenCloseControls electionId={election.id} status={election.status} />
+        <div className="flex items-center gap-2">
+          {election.status === "DRAFT" && (
+            <Link href={`/admin/elections/${election.id}/edit`}>
+              <Button variant="secondary">Edit</Button>
+            </Link>
+          )}
+          <OpenCloseControls electionId={election.id} status={election.status} />
+        </div>
       </div>
 
       <Card>

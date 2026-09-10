@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    # Loopback-only, so it's reachable from host tools (npm run dev, prisma studio,
+    # psql) without exposing Postgres on the network. Change the host port here if
+    # 5433 is also taken.
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_DB: luki
+      POSTGRES_USER: luki
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U luki"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  migrate:
+    build:
+      context: .
+      target: builder # needs the full node_modules (incl. the prisma CLI), unlike the slim runner image
+    command: ["npx", "prisma", "migrate", "deploy"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://luki:${POSTGRES_PASSWORD}@db:5432/luki
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal]
+
+  app:
+    build: .
+    container_name: luki-app
+    # No host port published - Traefik reaches this container over the
+    # traefik-public network (see deploy/traefik-dynamic-example.yml).
+    # For local testing without Traefik, temporarily add:
+    #   ports: ["3000:3000"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://luki:${POSTGRES_PASSWORD}@db:5432/luki
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - internal
+      - traefik-public
+
+networks:
+  internal: {}
+  # Pre-existing network that the user's own Traefik instance already watches.
+  # Create it once with: docker network create traefik-public
+  traefik-public:
+    external: true
+    name: traefik-public
+
+volumes:
+  db-data: {}

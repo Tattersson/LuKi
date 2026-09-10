@@ -1,0 +1,20 @@
+# Reference only - this file is NOT loaded by anything in this repo.
+#
+# It shows the router/service block to add to your own Traefik file-provider
+# dynamic configuration so it routes to the `luki-app` container started by
+# this repo's docker-compose.yml. Both Traefik and this app's `app` service
+# must be joined to the same Docker network (see `traefik-public` in
+# docker-compose.yml).
+
+http:
+  routers:
+    luki:
+      rule: "Host(`vote.example.com`)"
+      service: luki
+      entryPoints: [websecure]
+      tls: {}
+  services:
+    luki:
+      loadBalancer:
+        servers:
+          - url: "http://luki-app:3000"

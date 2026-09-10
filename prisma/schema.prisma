@@ -1,0 +1,113 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum ElectionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+/// The two roles every ballot votes on: one Captain pick, up to two distinct
+/// Vice-Captain picks. See vote-service.ts for the per-role vote-count rules.
+enum VotePosition {
+  CAPTAIN
+  VICE_CAPTAIN
+}
+
+model Election {
+  id                 String         @id @default(cuid())
+  title              String
+  description        String?
+  status             ElectionStatus @default(DRAFT)
+  publicSlug         String         @unique
+  createdByEmail     String
+  createdAt          DateTime       @default(now())
+  openedAt           DateTime?
+  closedAt           DateTime?
+  /// Optional deadline: the in-app scheduler (see election-lifecycle.ts) closes
+  /// the election automatically once this passes.
+  closesAt           DateTime?
+  /// Set once the closing results email has gone out, so closing twice (e.g. the
+  /// scheduler and an admin racing) never sends it twice.
+  resultsEmailSentAt DateTime?
+
+  candidates  Candidate[]
+  votedEmails VotedEmail[]
+  votes       Vote[]
+  otpRequests OtpRequest[]
+  otpSendLogs OtpSendLog[]
+}
+
+model Candidate {
+  id          String   @id @default(cuid())
+  electionId  String
+  election    Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  sortOrder   Int      @default(0)
+  votes       Vote[]
+}
+
+/// Proves "this email already voted in this election". Deliberately carries
+/// no reference to Vote / candidateId - see vote-service.ts for why.
+///
+/// `email` (plaintext) is kept solely to send the results notice once the
+/// election closes - a deliberate, explicitly-approved exception to this
+/// project's default of never persisting a voter's plaintext email. It is
+/// never joined against Vote and never shown anywhere in the admin UI.
+model VotedEmail {
+  id         String   @id @default(cuid())
+  electionId String
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  emailHash  String
+  email      String
+  votedAt    DateTime @default(now())
+
+  @@unique([electionId, emailHash])
+}
+
+/// An anonymous ballot. Deliberately carries no emailHash and no id shared
+/// with VotedEmail - see vote-service.ts for why.
+model Vote {
+  id          String       @id @default(cuid())
+  electionId  String
+  election    Election     @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate   Candidate    @relation(fields: [candidateId], references: [id])
+  position    VotePosition
+  castAt      DateTime     @default(now())
+}
+
+model OtpRequest {
+  id          String    @id @default(cuid())
+  electionId  String
+  election    Election  @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  emailHash   String
+  otpHash     String
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([electionId, emailHash, consumedAt, expiresAt])
+}
+
+/// Rate-limit bookkeeping only.
+model OtpSendLog {
+  id         String   @id @default(cuid())
+  electionId String
+  election   Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  emailHash  String
+  ipHash     String
+  createdAt  DateTime @default(now())
+
+  @@index([electionId, emailHash, createdAt])
+  @@index([ipHash, createdAt])
+}

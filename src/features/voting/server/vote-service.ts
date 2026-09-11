@@ -83,9 +83,15 @@ export async function verifyVoteOtp(params: {
 /**
  * Step 3: re-verifies the OTP and casts the ballot in a single transaction.
  *
- * Ballot shape: exactly one Captain pick, plus zero to MAX_VICE_CAPTAIN_VOTES
- * distinct Vice-Captain picks (a candidate may appear as both the Captain pick
- * and a Vice-Captain pick - the two roles are independent).
+ * Ballot shape depends on the election: a normal election takes exactly one
+ * Captain pick plus zero to MAX_VICE_CAPTAIN_VOTES distinct Vice-Captain picks
+ * (a candidate may appear as both the Captain pick and a Vice-Captain pick -
+ * the two roles are independent). A tie-breaker round (election.tieBreakerPosition
+ * set) only asks about that one position: a Captain tie-breaker takes exactly one
+ * pick and no Vice-Captain picks; a Vice-Captain tie-breaker takes one to
+ * election.tieBreakerSlots distinct picks and no Captain pick. The validation for
+ * this can only happen once the election is loaded, so - unlike a normal election -
+ * it lives inside the transaction rather than ahead of it.
  *
  * Anonymity guarantee: `VotedEmail` (proof this email voted) and `Vote` (each
  * anonymous ballot line) are written as independent rows with no shared id and
@@ -98,7 +104,7 @@ export async function verifyOtpAndCastVote(params: {
   electionId: string;
   email: string;
   otpCode: string;
-  captainCandidateId: string;
+  captainCandidateId?: string;
   viceCaptainCandidateIds: string[];
 }): Promise<void> {
   const { electionId, email, otpCode, captainCandidateId } = params;
@@ -108,22 +114,52 @@ export async function verifyOtpAndCastVote(params: {
   if (uniqueViceCaptainIds.length !== params.viceCaptainCandidateIds.length) {
     throw new InvalidBallotError("Vice-Captain picks must be different candidates.");
   }
-  if (uniqueViceCaptainIds.length > MAX_VICE_CAPTAIN_VOTES) {
-    throw new InvalidBallotError(
-      `You may select at most ${MAX_VICE_CAPTAIN_VOTES} Vice-Captains.`,
-    );
-  }
 
   await prisma.$transaction(async (tx) => {
     const election = await tx.election.findUniqueOrThrow({
       where: { id: electionId },
-      select: { status: true },
+      select: { status: true, tieBreakerPosition: true, tieBreakerSlots: true },
     });
     if (election.status !== "OPEN") {
       throw new ElectionNotOpenError();
     }
 
-    const allCandidateIds = [captainCandidateId, ...uniqueViceCaptainIds];
+    let captainPick: string | undefined;
+    let viceCaptainPicks: string[];
+
+    if (election.tieBreakerPosition === "CAPTAIN") {
+      if (!captainCandidateId) {
+        throw new InvalidBallotError("Please choose a Captain.");
+      }
+      if (uniqueViceCaptainIds.length > 0) {
+        throw new InvalidBallotError("This round only decides Captain.");
+      }
+      captainPick = captainCandidateId;
+      viceCaptainPicks = [];
+    } else if (election.tieBreakerPosition === "VICE_CAPTAIN") {
+      if (captainCandidateId) {
+        throw new InvalidBallotError("This round only decides Vice-Captain.");
+      }
+      const slots = election.tieBreakerSlots ?? 1;
+      if (uniqueViceCaptainIds.length < 1 || uniqueViceCaptainIds.length > slots) {
+        throw new InvalidBallotError(`Please select ${slots === 1 ? "1 Vice-Captain" : `1 to ${slots} Vice-Captains`}.`);
+      }
+      captainPick = undefined;
+      viceCaptainPicks = uniqueViceCaptainIds;
+    } else {
+      if (!captainCandidateId) {
+        throw new InvalidBallotError("Please choose a Captain.");
+      }
+      if (uniqueViceCaptainIds.length > MAX_VICE_CAPTAIN_VOTES) {
+        throw new InvalidBallotError(
+          `You may select at most ${MAX_VICE_CAPTAIN_VOTES} Vice-Captains.`,
+        );
+      }
+      captainPick = captainCandidateId;
+      viceCaptainPicks = uniqueViceCaptainIds;
+    }
+
+    const allCandidateIds = [...(captainPick ? [captainPick] : []), ...viceCaptainPicks];
     const matchingCandidateCount = await tx.candidate.count({
       where: { id: { in: allCandidateIds }, electionId },
     });
@@ -151,8 +187,10 @@ export async function verifyOtpAndCastVote(params: {
     // no field here ties these rows back to emailHash, to each other, or across positions.
     await tx.vote.createMany({
       data: [
-        { electionId, candidateId: captainCandidateId, position: "CAPTAIN" },
-        ...uniqueViceCaptainIds.map((candidateId) => ({
+        ...(captainPick
+          ? [{ electionId, candidateId: captainPick, position: "CAPTAIN" as const }]
+          : []),
+        ...viceCaptainPicks.map((candidateId) => ({
           electionId,
           candidateId,
           position: "VICE_CAPTAIN" as const,

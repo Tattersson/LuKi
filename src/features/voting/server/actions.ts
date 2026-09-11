@@ -9,6 +9,7 @@ import {
   createElectionSchema,
   updateElectionSchema,
   addCandidateSchema,
+  manualTieBreakerSchema,
 } from "../validation/schemas";
 import { requestVoteOtp, verifyVoteOtp, verifyOtpAndCastVote } from "./vote-service";
 import { hashIp } from "./email-hash";
@@ -19,16 +20,19 @@ import {
   updateElection,
 } from "./election-repository";
 import { closeElectionAndNotify } from "./election-lifecycle";
+import { createManualTieBreakerRound, type TieOutcome } from "./tie-breaker-service";
 import { requireAdmin } from "@/lib/auth/rbac";
 import {
   AddCandidateNotAllowedError,
   AlreadyVotedError,
+  ElectionNotClosedError,
   ElectionNotDraftError,
   ElectionNotOpenError,
   InvalidBallotError,
   InvalidCandidateError,
   InvalidOrExpiredOtpError,
   InvalidOtpError,
+  NoTieToBreakError,
   RateLimitedError,
   TooManyAttemptsError,
 } from "../domain/errors";
@@ -165,11 +169,42 @@ export async function openElectionAction(electionId: string): Promise<void> {
   revalidatePath(`/admin/elections/${electionId}`);
 }
 
-export async function closeElectionAction(electionId: string): Promise<void> {
+export async function closeElectionAction(
+  electionId: string,
+): Promise<ActionResult<{ ties: TieOutcome[] }>> {
   await requireAdmin();
-  await closeElectionAndNotify(electionId);
+  const ties = await closeElectionAndNotify(electionId);
   revalidatePath("/admin");
   revalidatePath(`/admin/elections/${electionId}`);
+  return { ok: true, data: { ties } };
+}
+
+/**
+ * Fallback for when the round cap stopped automatic tie-breaker creation: lets an
+ * admin manually open one more round for a still-tied position. See
+ * tie-breaker-service.ts's createManualTieBreakerRound for the re-check it does
+ * before creating anything.
+ */
+export async function startManualTieBreakerAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string; publicSlug: string }>> {
+  await requireAdmin();
+  const parsed = manualTieBreakerSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    const outcome = await createManualTieBreakerRound(parsed.data);
+    revalidatePath("/admin");
+    revalidatePath(`/admin/elections/${parsed.data.electionId}`);
+    if (outcome.roundId) {
+      revalidatePath(`/admin/elections/${outcome.roundId}`);
+    }
+    return { ok: true, data: { id: outcome.roundId!, publicSlug: outcome.roundPublicSlug! } };
+  } catch (error) {
+    return toErrorResult(error);
+  }
 }
 
 function toErrorResult(error: unknown): {
@@ -192,7 +227,9 @@ function toErrorResult(error: unknown): {
     error instanceof InvalidCandidateError ||
     error instanceof InvalidBallotError ||
     error instanceof ElectionNotDraftError ||
-    error instanceof AddCandidateNotAllowedError
+    error instanceof AddCandidateNotAllowedError ||
+    error instanceof ElectionNotClosedError ||
+    error instanceof NoTieToBreakError
   ) {
     return { ok: false, error: error.message };
   }

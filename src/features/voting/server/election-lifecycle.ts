@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db/prisma";
 import { getMailer } from "@/lib/mailer";
+import { getElectionTallies } from "./election-repository";
 import { renderResultsEmail } from "../mailer/templates/results-email";
+import { createTieBreakerRoundsIfNeeded, type TieOutcome } from "./tie-breaker-service";
+import { MAX_VICE_CAPTAIN_VOTES } from "../constants";
 
 /**
  * Names of the top `n` vote-getters, expanding to include everyone tied at a
@@ -24,54 +27,52 @@ function topNWithTies(
 }
 
 /**
- * Closes an election (if not already closed) and emails every voter the winners.
+ * Closes an election (if not already closed), emails every voter the winners, and -
+ * if a position ended in a tie - automatically opens a linked tie-breaker round (see
+ * tie-breaker-service.ts) and returns the outcome so the caller can tell the admin.
+ *
  * Safe to call more than once (e.g. an admin closing right as the scheduler fires) -
  * the guarded update only succeeds once, and only the caller that actually flipped
- * the status computes results and sends mail.
+ * the status computes results, sends mail, and checks for ties.
  *
  * Voter emails come from VotedEmail.email - the one deliberate exception to this
  * project's "never persist a plaintext voter email" rule, kept solely for this.
  */
-export async function closeElectionAndNotify(electionId: string): Promise<void> {
+export async function closeElectionAndNotify(electionId: string): Promise<TieOutcome[]> {
   const { count } = await prisma.election.updateMany({
     where: { id: electionId, status: "OPEN" },
     data: { status: "CLOSED", closedAt: new Date() },
   });
   if (count === 0) {
-    return; // already closed (or never open) - nothing to do
+    return []; // already closed (or never open) - nothing to do
   }
 
-  const [election, tallies, voters] = await Promise.all([
+  const [election, { candidates, captainTally, viceCaptainTally }, voters] = await Promise.all([
     prisma.election.findUniqueOrThrow({
       where: { id: electionId },
-      select: { title: true },
+      select: {
+        title: true,
+        round: true,
+        createdByEmail: true,
+        tieBreakerPosition: true,
+        tieBreakerSlots: true,
+      },
     }),
-    prisma.vote.groupBy({
-      by: ["candidateId", "position"],
-      where: { electionId },
-      _count: { candidateId: true },
-    }),
+    getElectionTallies(electionId),
     prisma.votedEmail.findMany({ where: { electionId }, select: { email: true } }),
   ]);
 
-  const candidates = await prisma.candidate.findMany({
-    where: { electionId },
-    select: { id: true, name: true },
-  });
-  const nameById = new Map(candidates.map((c) => [c.id, c.name]));
-
-  function tallyFor(position: "CAPTAIN" | "VICE_CAPTAIN") {
-    return tallies
-      .filter((t) => t.position === position)
-      .map((t) => ({
-        candidateId: t.candidateId,
-        name: nameById.get(t.candidateId) ?? "Unknown",
-        votes: t._count.candidateId,
-      }));
-  }
-
-  const captainWinners = topNWithTies(tallyFor("CAPTAIN"), 1);
-  const viceCaptainWinners = topNWithTies(tallyFor("VICE_CAPTAIN"), 2);
+  const captainWinners =
+    election.tieBreakerPosition === "VICE_CAPTAIN" ? null : topNWithTies(captainTally, 1);
+  const viceCaptainWinners =
+    election.tieBreakerPosition === "CAPTAIN"
+      ? null
+      : topNWithTies(
+          viceCaptainTally,
+          election.tieBreakerPosition === "VICE_CAPTAIN"
+            ? (election.tieBreakerSlots ?? 1)
+            : MAX_VICE_CAPTAIN_VOTES,
+        );
 
   const mailer = getMailer();
   await Promise.allSettled(
@@ -90,5 +91,13 @@ export async function closeElectionAndNotify(electionId: string): Promise<void> 
   await prisma.election.update({
     where: { id: electionId },
     data: { resultsEmailSentAt: new Date() },
+  });
+
+  return createTieBreakerRoundsIfNeeded({
+    parent: { id: electionId, ...election },
+    candidates,
+    captainTally,
+    viceCaptainTally,
+    voterEmails: voters.map((v) => v.email),
   });
 }

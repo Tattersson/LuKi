@@ -1,4 +1,8 @@
-import type { ElectionResults as ElectionResultsData, PositionResult } from "../../domain/types";
+import type {
+  ElectionResults as ElectionResultsData,
+  PositionResult,
+  VotePosition,
+} from "../../domain/types";
 
 function ResultsBars({ results }: { results: PositionResult[] }) {
   const maxVotes = Math.max(1, ...results.map((r) => r.votes));
@@ -26,21 +30,36 @@ function ResultsBars({ results }: { results: PositionResult[] }) {
   );
 }
 
-export function ElectionResults({ results }: { results: ElectionResultsData }) {
+/**
+ * When `tieBreakerPosition` is set, only that position's section is shown - the
+ * round's candidates never competed for the other position, so it would otherwise
+ * show a misleading all-zero section.
+ */
+export function ElectionResults({
+  results,
+  tieBreakerPosition,
+}: {
+  results: ElectionResultsData;
+  tieBreakerPosition?: VotePosition | null;
+}) {
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="mb-2 text-xs font-medium tracking-wide text-neutral-500 uppercase">
-          Captain
-        </h3>
-        <ResultsBars results={results.captainResults} />
-      </div>
-      <div>
-        <h3 className="mb-2 text-xs font-medium tracking-wide text-neutral-500 uppercase">
-          Vice-Captain
-        </h3>
-        <ResultsBars results={results.viceCaptainResults} />
-      </div>
+      {tieBreakerPosition !== "VICE_CAPTAIN" && (
+        <div>
+          <h3 className="mb-2 text-xs font-medium tracking-wide text-neutral-500 uppercase">
+            Captain
+          </h3>
+          <ResultsBars results={results.captainResults} />
+        </div>
+      )}
+      {tieBreakerPosition !== "CAPTAIN" && (
+        <div>
+          <h3 className="mb-2 text-xs font-medium tracking-wide text-neutral-500 uppercase">
+            Vice-Captain
+          </h3>
+          <ResultsBars results={results.viceCaptainResults} />
+        </div>
+      )}
     </div>
   );
 }

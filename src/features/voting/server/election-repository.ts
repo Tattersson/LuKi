@@ -1,14 +1,17 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { AddCandidateNotAllowedError, ElectionNotDraftError } from "../domain/errors";
+import { POSITION_LABELS } from "../constants";
 import type {
   ElectionResults,
   ElectionSummary,
   PositionResult,
+  PositionTally,
   PublicElectionView,
+  VotePosition,
 } from "../domain/types";
 
-function generatePublicSlug(): string {
+export function generatePublicSlug(): string {
   return randomBytes(12).toString("base64url");
 }
 
@@ -38,8 +41,10 @@ export async function createElection(params: {
   });
 }
 
+/** Only root elections - tie-breaker rounds are reached by drilling into their parent. */
 export async function listElections(): Promise<ElectionSummary[]> {
   const elections = await prisma.election.findMany({
+    where: { parentElectionId: null },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { candidates: true, votes: true } } },
   });
@@ -58,7 +63,24 @@ export async function listElections(): Promise<ElectionSummary[]> {
 export async function getElectionForAdmin(id: string) {
   return prisma.election.findUnique({
     where: { id },
-    include: { candidates: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      candidates: { orderBy: { sortOrder: "asc" } },
+      parentElection: { select: { id: true, title: true, round: true } },
+      childElections: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          round: true,
+          tieBreakerPosition: true,
+          publicSlug: true,
+        },
+        orderBy: { createdAt: "asc" },
+      },
+      // Exact voter count: one VotedEmail row per person who voted, regardless of how
+      // many candidates they picked - unlike counting Vote rows (1-3 per person).
+      _count: { select: { votedEmails: true } },
+    },
   });
 }
 
@@ -75,6 +97,8 @@ export async function getPublicElectionBySlug(
     title: election.title,
     description: election.description,
     status: election.status,
+    tieBreakerPosition: election.tieBreakerPosition,
+    tieBreakerSlots: election.tieBreakerSlots,
     candidates: election.candidates.map((c) => ({
       id: c.id,
       name: c.name,
@@ -180,6 +204,67 @@ export async function addCandidateToElection(params: {
   });
 }
 
+/**
+ * Creates a tie-breaker round: a fresh, immediately-open election scoped to a single
+ * position, containing only the tied candidates. Idempotent per (parentElectionId,
+ * tieBreakerPosition) - returns the existing round instead of creating a duplicate if
+ * called twice (e.g. a racing scheduler/admin close), backed by the DB unique constraint.
+ */
+export async function createTieBreakerElection(params: {
+  parentElectionId: string;
+  parentTitle: string;
+  parentRound: number;
+  createdByEmail: string;
+  position: VotePosition;
+  slotsToFill: number;
+  candidates: Array<{ id: string; name: string; description: string | null }>;
+}) {
+  const {
+    parentElectionId,
+    parentTitle,
+    parentRound,
+    createdByEmail,
+    position,
+    slotsToFill,
+    candidates,
+  } = params;
+
+  const positionLabel = POSITION_LABELS[position];
+  // Strip a suffix from an earlier round in the same lineage so repeated ties for the
+  // same position don't stack up ("... - Captain tie-breaker - Captain tie-breaker").
+  const baseTitle = parentTitle.replace(/ — (Captain|Vice-Captain) tie-breaker$/, "");
+
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.election.findFirst({
+      where: { parentElectionId, tieBreakerPosition: position },
+    });
+    if (existing) return existing;
+
+    return tx.election.create({
+      data: {
+        title: `${baseTitle} — ${positionLabel} tie-breaker`,
+        description: `A tie for ${positionLabel} needs one more vote to decide between: ${candidates.map((c) => c.name).join(", ")}.`,
+        status: "OPEN",
+        openedAt: new Date(),
+        createdByEmail,
+        publicSlug: generatePublicSlug(),
+        round: parentRound + 1,
+        parentElectionId,
+        tieBreakerPosition: position,
+        tieBreakerSlots: slotsToFill,
+        candidates: {
+          create: candidates.map((c, index) => ({
+            name: c.name,
+            description: c.description,
+            sortOrder: index,
+            sourceCandidateId: c.id,
+          })),
+        },
+      },
+    });
+  });
+}
+
 /** Opens an election. Closing goes through election-lifecycle.ts's closeElectionAndNotify instead,
  *  since closing also has to tally results and send the notification email. */
 export async function openElection(id: string) {
@@ -187,6 +272,42 @@ export async function openElection(id: string) {
     where: { id },
     data: { status: "OPEN", openedAt: new Date() },
   });
+}
+
+/** Raw per-candidate vote counts for both positions, used for tie detection. */
+export async function getElectionTallies(electionId: string): Promise<{
+  candidates: Array<{ id: string; name: string; description: string | null }>;
+  captainTally: PositionTally[];
+  viceCaptainTally: PositionTally[];
+}> {
+  const [candidates, tallies] = await Promise.all([
+    prisma.candidate.findMany({
+      where: { electionId },
+      select: { id: true, name: true, description: true },
+    }),
+    prisma.vote.groupBy({
+      by: ["candidateId", "position"],
+      where: { electionId },
+      _count: { candidateId: true },
+    }),
+  ]);
+  const nameById = new Map(candidates.map((c) => [c.id, c.name]));
+
+  function tallyFor(position: "CAPTAIN" | "VICE_CAPTAIN"): PositionTally[] {
+    return tallies
+      .filter((t) => t.position === position)
+      .map((t) => ({
+        candidateId: t.candidateId,
+        name: nameById.get(t.candidateId) ?? "Unknown",
+        votes: t._count.candidateId,
+      }));
+  }
+
+  return {
+    candidates,
+    captainTally: tallyFor("CAPTAIN"),
+    viceCaptainTally: tallyFor("VICE_CAPTAIN"),
+  };
 }
 
 export async function getElectionResults(id: string): Promise<ElectionResults | null> {

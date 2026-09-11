@@ -37,11 +37,29 @@ model Election {
   /// scheduler and an admin racing) never sends it twice.
   resultsEmailSentAt DateTime?
 
+  /// Round 1 unless this election is a tie-breaker round, in which case it's the
+  /// parent's round + 1 (see tie-breaker-service.ts). Capped by MAX_TIE_BREAKER_ROUNDS.
+  round Int @default(1)
+  /// Null for a normal election. Set on a tie-breaker round to the single position
+  /// it exists to decide - see tieBreakerSlots for how many seats are still open.
+  tieBreakerPosition VotePosition?
+  /// Null for a normal election. On a tie-breaker round, how many winner slots for
+  /// tieBreakerPosition are still undecided and up for a re-vote among its candidates.
+  tieBreakerSlots Int?
+
+  parentElectionId String?
+  parentElection    Election?  @relation("TieBreakerRounds", fields: [parentElectionId], references: [id], onDelete: Cascade)
+  childElections    Election[] @relation("TieBreakerRounds")
+
   candidates  Candidate[]
   votedEmails VotedEmail[]
   votes       Vote[]
   otpRequests OtpRequest[]
   otpSendLogs OtpSendLog[]
+
+  /// Guards against double-creating the same round (e.g. a racing scheduler/admin
+  /// close); Postgres treats NULLs as distinct so normal elections never collide.
+  @@unique([parentElectionId, tieBreakerPosition])
 }
 
 model Candidate {
@@ -52,6 +70,11 @@ model Candidate {
   description String?
   sortOrder   Int      @default(0)
   votes       Vote[]
+
+  /// Provenance only, not a real relation: on a tie-breaker round's candidates, the
+  /// id of the original candidate this row was copied from. Candidates belong to
+  /// exactly one election, so a tie-breaker roster is always a fresh copy.
+  sourceCandidateId String?
 }
 
 /// Proves "this email already voted in this election". Deliberately carries

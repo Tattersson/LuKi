@@ -68,3 +68,17 @@ export class AddCandidateNotAllowedError extends Error {
     this.name = "AddCandidateNotAllowedError";
   }
 }
+
+export class ElectionNotClosedError extends Error {
+  constructor() {
+    super("This election must be closed before starting a tie-breaker round.");
+    this.name = "ElectionNotClosedError";
+  }
+}
+
+export class NoTieToBreakError extends Error {
+  constructor() {
+    super("This position isn't currently tied - there's nothing to break.");
+    this.name = "NoTieToBreakError";
+  }
+}

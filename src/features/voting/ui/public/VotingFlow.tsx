@@ -99,7 +99,7 @@ export function VotingFlow({ election }: { election: PublicElectionView }) {
   }
 
   async function handleCastVote(params: {
-    captainCandidateId: string;
+    captainCandidateId?: string;
     viceCaptainCandidateIds: string[];
   }) {
     setPending(true);
@@ -131,6 +131,8 @@ export function VotingFlow({ election }: { election: PublicElectionView }) {
     return (
       <VoteStep
         candidates={election.candidates}
+        tieBreakerPosition={election.tieBreakerPosition}
+        tieBreakerSlots={election.tieBreakerSlots}
         onSubmit={handleCastVote}
         pending={pending}
         error={error}

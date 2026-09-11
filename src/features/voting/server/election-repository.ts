@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
-import { ElectionNotDraftError } from "../domain/errors";
+import { AddCandidateNotAllowedError, ElectionNotDraftError } from "../domain/errors";
 import type {
   ElectionResults,
   ElectionSummary,
@@ -139,6 +139,44 @@ export async function updateElection(params: {
         });
       }
     }
+  });
+}
+
+/**
+ * Adds a single candidate to an already-open election. Deliberately separate from
+ * updateElection: that reconciliation deletes candidates omitted from its list, which
+ * would risk orphaning existing votes once the election is open - this only ever inserts.
+ */
+export async function addCandidateToElection(params: {
+  electionId: string;
+  name: string;
+  description?: string;
+}) {
+  const { electionId, name, description } = params;
+
+  return prisma.$transaction(async (tx) => {
+    const election = await tx.election.findUniqueOrThrow({
+      where: { id: electionId },
+      select: { status: true },
+    });
+    if (election.status !== "OPEN") {
+      throw new AddCandidateNotAllowedError();
+    }
+
+    const lastCandidate = await tx.candidate.findFirst({
+      where: { electionId },
+      orderBy: { sortOrder: "desc" },
+      select: { sortOrder: true },
+    });
+
+    return tx.candidate.create({
+      data: {
+        electionId,
+        name,
+        description,
+        sortOrder: (lastCandidate?.sortOrder ?? -1) + 1,
+      },
+    });
   });
 }
 

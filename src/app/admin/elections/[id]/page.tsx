@@ -9,6 +9,7 @@ import {
 import { ElectionStatusBadge } from "@/features/voting/ui/admin/ElectionStatusBadge";
 import { OpenCloseControls } from "@/features/voting/ui/admin/OpenCloseControls";
 import { ElectionResults } from "@/features/voting/ui/admin/ElectionResults";
+import { AddCandidateForm } from "@/features/voting/ui/admin/AddCandidateForm";
 
 export default async function ElectionDetailPage({
   params,
@@ -69,11 +70,12 @@ export default async function ElectionDetailPage({
         <p className="mb-2 text-xs text-neutral-500">
           Each voter picks one Captain and up to two Vice-Captains from this roster.
         </p>
-        <ul className="space-y-1 text-sm">
+        <ul className="mb-3 space-y-1 text-sm">
           {election.candidates.map((candidate) => (
             <li key={candidate.id}>{candidate.name}</li>
           ))}
         </ul>
+        {election.status === "OPEN" && <AddCandidateForm electionId={election.id} />}
       </Card>
 
       <Card>

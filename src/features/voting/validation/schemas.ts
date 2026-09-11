@@ -46,3 +46,9 @@ export const updateElectionSchema = z.object({
     .array(candidateInputSchema.extend({ id: z.string().optional() }))
     .min(2, "An election needs at least two candidates"),
 });
+
+export const addCandidateSchema = z.object({
+  electionId: z.string().min(1),
+  name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+});

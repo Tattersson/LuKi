@@ -61,3 +61,10 @@ export class ElectionNotDraftError extends Error {
     this.name = "ElectionNotDraftError";
   }
 }
+
+export class AddCandidateNotAllowedError extends Error {
+  constructor() {
+    super("Candidates can only be added while the election is open.");
+    this.name = "AddCandidateNotAllowedError";
+  }
+}

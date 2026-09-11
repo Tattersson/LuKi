@@ -8,13 +8,20 @@ import {
   verifyOtpAndVoteSchema,
   createElectionSchema,
   updateElectionSchema,
+  addCandidateSchema,
 } from "../validation/schemas";
 import { requestVoteOtp, verifyVoteOtp, verifyOtpAndCastVote } from "./vote-service";
 import { hashIp } from "./email-hash";
-import { createElection, openElection, updateElection } from "./election-repository";
+import {
+  addCandidateToElection,
+  createElection,
+  openElection,
+  updateElection,
+} from "./election-repository";
 import { closeElectionAndNotify } from "./election-lifecycle";
 import { requireAdmin } from "@/lib/auth/rbac";
 import {
+  AddCandidateNotAllowedError,
   AlreadyVotedError,
   ElectionNotDraftError,
   ElectionNotOpenError,
@@ -133,6 +140,24 @@ export async function updateElectionAction(
   return { ok: true, data: { id: parsed.data.electionId } };
 }
 
+export async function addCandidateAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  await requireAdmin();
+  const parsed = addCandidateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  try {
+    const candidate = await addCandidateToElection(parsed.data);
+    revalidatePath(`/admin/elections/${parsed.data.electionId}`);
+    return { ok: true, data: { id: candidate.id } };
+  } catch (error) {
+    return toErrorResult(error);
+  }
+}
+
 export async function openElectionAction(electionId: string): Promise<void> {
   await requireAdmin();
   await openElection(electionId);
@@ -166,7 +191,8 @@ function toErrorResult(error: unknown): {
     error instanceof ElectionNotOpenError ||
     error instanceof InvalidCandidateError ||
     error instanceof InvalidBallotError ||
-    error instanceof ElectionNotDraftError
+    error instanceof ElectionNotDraftError ||
+    error instanceof AddCandidateNotAllowedError
   ) {
     return { ok: false, error: error.message };
   }

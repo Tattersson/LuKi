@@ -1,4 +1,5 @@
 import { ASSUMED_GAME_DURATION_MINUTES } from "../constants";
+import { gameDetailLines, gameEventTitle } from "../format";
 import type { TeamGame } from "./types";
 
 const FOLD_LENGTH = 75;
@@ -76,7 +77,7 @@ export function gamesToICS(games: TeamGame[]): string {
   for (const game of games) {
     const start = gameStart(game);
     const end = gameEnd(start);
-    const summary = `${game.teamLabel}: ${game.isHome ? "vs" : "@"} ${game.opponent}`;
+    const detailLines = gameDetailLines(game);
 
     lines.push(
       "BEGIN:VEVENT",
@@ -84,11 +85,11 @@ export function gamesToICS(games: TeamGame[]): string {
       `DTSTAMP:${dtstamp}`,
       `DTSTART;TZID=Europe/Helsinki:${toICSDateTime(start)}`,
       `DTEND;TZID=Europe/Helsinki:${toICSDateTime(end)}`,
-      `SUMMARY:${escapeText(summary)}`,
+      `SUMMARY:${escapeText(gameEventTitle(game))}`,
       `LOCATION:${escapeText(game.rinkName)}`,
-      "SEQUENCE:0",
-      "END:VEVENT",
     );
+    if (detailLines.length > 0) lines.push(`DESCRIPTION:${escapeText(detailLines.join("\n"))}`);
+    lines.push("SEQUENCE:0", "END:VEVENT");
   }
 
   lines.push("END:VCALENDAR");

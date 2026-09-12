@@ -1,19 +1,179 @@
-/* Overrides for react-big-calendar's month view on narrow screens. Loaded after the
- * library's own stylesheet (see GamesCalendar.tsx) so these rules win without needing
- * !important beyond what constants.ts's event colors already use. */
+/* Visual design for react-big-calendar's month view (the only view this app uses).
+ * Loaded after the library's own stylesheet (see GamesCalendar.tsx) so these rules win
+ * without needing !important beyond what constants.ts's event colors already use.
+ * Colors are CSS variables scoped to .luki-calendar so light/dark just swaps one block,
+ * following the same @media (prefers-color-scheme: dark) approach as globals.css (this
+ * app doesn't use a `.dark` class toggle). */
+.luki-calendar {
+  --cal-border: #e5e5e5;
+  --cal-border-strong: #d4d4d4;
+  --cal-hover: #f5f5f5;
+  --cal-active-bg: #171717;
+  --cal-active-text: #ffffff;
+  --cal-muted: #737373;
+  --cal-off-range: #a3a3a3;
+  --cal-off-range-bg: #fafafa;
+  --cal-today-bg: #eff6ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .luki-calendar {
+    --cal-border: #262626;
+    --cal-border-strong: #404040;
+    --cal-hover: #262626;
+    --cal-active-bg: #ffffff;
+    --cal-active-text: #171717;
+    --cal-muted: #a3a3a3;
+    --cal-off-range: #525252;
+    --cal-off-range-bg: #171717;
+    --cal-today-bg: rgba(59, 130, 246, 0.16);
+  }
+}
+
+/* Toolbar: title first, nav buttons as a segmented pill after it - same order on every
+ * screen size, just wraps on narrow ones. */
+.luki-calendar .rbc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--cal-border);
+}
+
+.luki-calendar .rbc-toolbar-label {
+  order: -1;
+  flex: 1 1 auto;
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.luki-calendar .rbc-btn-group {
+  display: inline-flex;
+  border-radius: 0.5rem;
+  border: 1px solid var(--cal-border-strong);
+  overflow: hidden;
+}
+
+.luki-calendar .rbc-btn-group button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.luki-calendar .rbc-btn-group button + button {
+  border-left: 1px solid var(--cal-border-strong);
+}
+
+.luki-calendar .rbc-btn-group button:hover {
+  background: var(--cal-hover);
+}
+
+.luki-calendar .rbc-btn-group button:active {
+  background: var(--cal-active-bg);
+  color: var(--cal-active-text);
+}
+
+.luki-calendar .rbc-btn-group button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Month grid */
+.luki-calendar .rbc-month-view {
+  border: none;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.luki-calendar .rbc-month-row + .rbc-month-row,
+.luki-calendar .rbc-day-bg + .rbc-day-bg,
+.luki-calendar .rbc-header + .rbc-header {
+  border-color: var(--cal-border);
+}
+
+.luki-calendar .rbc-header {
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid var(--cal-border);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cal-muted);
+}
+
+.luki-calendar .rbc-off-range-bg {
+  background: var(--cal-off-range-bg);
+}
+
+.luki-calendar .rbc-off-range {
+  color: var(--cal-off-range);
+}
+
+.luki-calendar .rbc-today {
+  background: var(--cal-today-bg);
+}
+
+.luki-calendar .rbc-date-cell {
+  padding: 0.25rem 0.4rem;
+  font-size: 0.75rem;
+}
+
+.luki-calendar .rbc-date-cell.rbc-now {
+  font-weight: 700;
+}
+
+.luki-calendar .rbc-button-link {
+  border-radius: 9999px;
+}
+
+.luki-calendar .rbc-show-more {
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: none;
+}
+
+.luki-calendar .rbc-show-more:hover {
+  text-decoration: underline;
+}
+
+/* Event pills */
+.luki-calendar .rbc-event {
+  padding: 2px 6px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.luki-calendar .rbc-event-content {
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.luki-calendar .rbc-event.rbc-selected {
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
 @media (max-width: 640px) {
   .luki-calendar .rbc-toolbar {
     flex-direction: column;
     align-items: stretch;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
   }
 
   .luki-calendar .rbc-toolbar-label {
-    order: -1;
+    text-align: center;
     font-size: 0.9rem;
-    font-weight: 600;
-    padding: 0;
   }
 
   .luki-calendar .rbc-btn-group {
@@ -29,8 +189,8 @@
   }
 
   .luki-calendar .rbc-header {
-    padding: 4px 2px;
-    font-size: 0.65rem;
+    padding: 0.35rem 0.15rem;
+    font-size: 0.6rem;
   }
 
   .luki-calendar .rbc-date-cell {
@@ -39,11 +199,14 @@
   }
 
   .luki-calendar .rbc-event {
-    padding: 1px 2px;
-    font-size: 0.65rem;
+    padding: 1px 3px;
+  }
+
+  .luki-calendar .rbc-event-content {
+    font-size: 0.62rem;
   }
 
   .luki-calendar .rbc-show-more {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
   }
 }

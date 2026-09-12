@@ -36,7 +36,7 @@ services:
     build: .
     container_name: luki-app
     # No host port published - Traefik reaches this container over the
-    # traefik-public network (see deploy/traefik-dynamic-example.yml).
+    # shared frontend network.
     # For local testing without Traefik, temporarily add:
     #   ports: ["3000:3000"]
     env_file: .env
@@ -47,15 +47,14 @@ services:
         condition: service_completed_successfully
     networks:
       - internal
-      - traefik-public
+      - frontend
 
 networks:
   internal: {}
-  # Pre-existing network that the user's own Traefik instance already watches.
-  # Create it once with: docker network create traefik-public
-  traefik-public:
+  # Pre-existing network used by the Traefik container.
+  frontend:
     external: true
-    name: traefik-public
+    name: frontend
 
 volumes:
   db-data: {}

@@ -147,14 +147,14 @@ function LineFormation({ line, players }: { line: number | null; players: Roster
       </h3>
       <div className="space-y-2">
         {forwards.length > 0 && (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {sortByPosition(forwards, ["VL", "KH", "OL"]).map((player) => (
               <PlayerCard key={`${player.jersey}-${player.name}`} player={player} />
             ))}
           </div>
         )}
         {defence.length > 0 && (
-          <div className="mx-auto grid max-w-[75%] grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2 sm:mx-auto sm:max-w-[75%] sm:grid-cols-2">
             {sortByPosition(defence, ["VP", "OP"]).map((player) => (
               <PlayerCard key={`${player.jersey}-${player.name}`} player={player} />
             ))}
@@ -182,7 +182,7 @@ function PlayerCard({ player }: { player: RosterPlayer }) {
       <div className="font-mono text-xs text-neutral-500">
         {player.position} · #{player.jersey}
       </div>
-      <div className="truncate text-sm font-medium">
+      <div className="text-sm leading-snug font-medium wrap-break-word">
         {player.name}
         {player.captain && <span className="ml-1 text-xs text-neutral-500">({player.captain})</span>}
       </div>

@@ -4,6 +4,9 @@ import {
   AWAY_GAME_BACKGROUND,
   AWAY_GAME_MUTED_TEXT,
   AWAY_GAME_TEXT,
+  FINISHED_GAME_BACKGROUND,
+  FINISHED_GAME_MUTED_TEXT,
+  FINISHED_GAME_TEXT,
   HOME_GAME_BACKGROUND,
   HOME_GAME_MUTED_TEXT,
   HOME_GAME_TEXT,
@@ -36,18 +39,23 @@ export function GamesList({
 }
 
 function GameRow({ game, liveReport }: { game: TeamGame; liveReport?: LiveGameReport }) {
-  const background = game.isHome ? HOME_GAME_BACKGROUND : AWAY_GAME_BACKGROUND;
-  const textColor = game.isHome ? HOME_GAME_TEXT : AWAY_GAME_TEXT;
-  const mutedTextColor = game.isHome ? HOME_GAME_MUTED_TEXT : AWAY_GAME_MUTED_TEXT;
-  const dotColor = game.conflict === "overlap" ? OVERLAP_COLOR.dot : TEAM_COLORS[game.team].dot;
-  const homeTeamName = game.isHome ? game.teamLabel : game.opponent;
-  const awayTeamName = game.isHome ? game.opponent : game.teamLabel;
-
   // The live poll can override the schedule's status/score - e.g. once a live game
   // finishes, the next 30s poll flips it to "finished" without a page reload.
   const status = liveReport?.status ?? game.status;
   const homeGoals = liveReport?.homeGoals ?? game.homeGoals;
   const awayGoals = liveReport?.awayGoals ?? game.awayGoals;
+
+  const isPast = status === "finished";
+  const background = isPast ? FINISHED_GAME_BACKGROUND : game.isHome ? HOME_GAME_BACKGROUND : AWAY_GAME_BACKGROUND;
+  const textColor = isPast ? FINISHED_GAME_TEXT : game.isHome ? HOME_GAME_TEXT : AWAY_GAME_TEXT;
+  const mutedTextColor = isPast
+    ? FINISHED_GAME_MUTED_TEXT
+    : game.isHome
+      ? HOME_GAME_MUTED_TEXT
+      : AWAY_GAME_MUTED_TEXT;
+  const dotColor = game.conflict === "overlap" ? OVERLAP_COLOR.dot : TEAM_COLORS[game.team].dot;
+  const homeTeamName = game.isHome ? game.teamLabel : game.opponent;
+  const awayTeamName = game.isHome ? game.opponent : game.teamLabel;
 
   return (
     <li>
@@ -66,7 +74,7 @@ function GameRow({ game, liveReport }: { game: TeamGame; liveReport?: LiveGameRe
         <div className="flex items-start gap-3">
           <span
             className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: dotColor, border: "1px solid rgba(0,0,0,0.35)" }}
+            style={{ backgroundColor: dotColor, border: "1px solid rgba(0,0,0,0.35)", opacity: isPast ? 0.5 : 1 }}
             aria-hidden
           />
           <div className="min-w-0 flex-1">

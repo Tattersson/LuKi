@@ -48,6 +48,12 @@ export const AWAY_GAME_BACKGROUND = "#1F305E";
 export const AWAY_GAME_TEXT = "#FFFFFF";
 export const AWAY_GAME_MUTED_TEXT = "#CBD5E1";
 
+/** Applied instead of the home/away colors above once a game is over (finished and not
+ *  live) - past results fade into the background so upcoming/live games stand out. */
+export const FINISHED_GAME_BACKGROUND = "#E5E7EB";
+export const FINISHED_GAME_TEXT = "#4B5563";
+export const FINISHED_GAME_MUTED_TEXT = "#9CA3AF";
+
 /** Badges are self-contained (own background + text) so they stay readable regardless
  *  of which row background (home/away) they're placed on. */
 export const OVERLAP_BADGE = { background: "#F59E0B", text: "#1F2937" };

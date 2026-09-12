@@ -44,10 +44,12 @@ const eventPropGetter: EventPropGetter<PracticeEvent> = ({ practice }) => ({
 
 export function PracticesCalendar({
   practices,
+  isSignedIn,
   canRsvp,
   rsvpByPracticeId,
 }: {
   practices: Practice[];
+  isSignedIn: boolean;
   canRsvp: boolean;
   rsvpByPracticeId: Record<string, RsvpData>;
 }) {
@@ -90,6 +92,7 @@ export function PracticesCalendar({
             )}
             <PracticeRsvpSummary
               practiceId={selected.id}
+              isSignedIn={isSignedIn}
               canRsvp={canRsvp}
               summary={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).summary}
               myStatus={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).myStatus}

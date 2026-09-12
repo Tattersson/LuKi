@@ -27,20 +27,26 @@ export default async function PracticeDetailPage({
   }
 
   const session = await auth();
+  const isSignedIn = !!session?.user;
   const canRsvp = hasAnyRole(session, [PLAYER_ROLE_NAME]);
   const player = canRsvp ? await getCurrentPlayer() : null;
 
-  const [summary, myStatus, registeredCount] = await Promise.all([
-    getRsvpSummary(practice.id),
-    player ? getRsvpForPlayer(practice.id, player.id) : Promise.resolve(null),
-    countPlayers(),
-  ]);
+  // RSVP names/counts are never fetched for an anonymous visitor, so there's nothing
+  // to leak via the page's HTML/RSC payload either.
+  const [summary, myStatus, registeredCount] = isSignedIn
+    ? await Promise.all([
+        getRsvpSummary(practice.id),
+        player ? getRsvpForPlayer(practice.id, player.id) : Promise.resolve(null),
+        countPlayers(),
+      ])
+    : [null, null, null];
 
-  const rsvpdCount =
-    summary.goalkeepers.in.length +
-    summary.goalkeepers.out.length +
-    summary.players.in.length +
-    summary.players.out.length;
+  const rsvpdCount = summary
+    ? summary.goalkeepers.in.length +
+      summary.goalkeepers.out.length +
+      summary.players.in.length +
+      summary.players.out.length
+    : 0;
 
   const start = toLocalDisplayDate(practice.startAt);
   const end = toLocalDisplayDate(practice.endAt);
@@ -82,26 +88,35 @@ export default async function PracticeDetailPage({
             <dt className="text-neutral-500">Location</dt>
             <dd>{practice.locationName}</dd>
           </div>
-          <div>
-            <dt className="text-neutral-500">RSVP&apos;d</dt>
-            <dd>
-              {rsvpdCount} of {registeredCount} registered players
-            </dd>
-          </div>
         </dl>
         {practice.description && (
           <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">{practice.description}</p>
         )}
       </Card>
 
-      <div className="mt-4">
-        <RsvpButtons practiceId={practice.id} canRsvp={canRsvp} myStatus={myStatus} size="lg" />
-      </div>
+      {isSignedIn && summary ? (
+        <>
+          <p className="mt-4 text-sm text-neutral-500">
+            {rsvpdCount} of {registeredCount} registered players have RSVP&apos;d
+          </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <PositionBox label="Goalies" bucket={summary.goalkeepers} />
-        <PositionBox label="Players" bucket={summary.players} />
-      </div>
+          <div className="mt-2">
+            <RsvpButtons practiceId={practice.id} canRsvp={canRsvp} myStatus={myStatus} size="lg" />
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <PositionBox label="Goalies" bucket={summary.goalkeepers} />
+            <PositionBox label="Players" bucket={summary.players} />
+          </div>
+        </>
+      ) : (
+        <Alert variant="info" className="mt-4">
+          <Link href="/api/auth/signin" className="font-medium underline">
+            Sign in
+          </Link>{" "}
+          to view who&apos;s in/out and RSVP counts.
+        </Alert>
+      )}
     </main>
   );
 }

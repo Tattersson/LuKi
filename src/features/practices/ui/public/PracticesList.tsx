@@ -8,10 +8,12 @@ import { PracticeRsvpSummary } from "./PracticeRsvpSummary";
 
 export function PracticesList({
   practices,
+  isSignedIn,
   canRsvp,
   rsvpByPracticeId,
 }: {
   practices: Practice[];
+  isSignedIn: boolean;
   canRsvp: boolean;
   rsvpByPracticeId: Record<string, RsvpData>;
 }) {
@@ -25,6 +27,7 @@ export function PracticesList({
         <PracticeRow
           key={practice.id}
           practice={practice}
+          isSignedIn={isSignedIn}
           canRsvp={canRsvp}
           rsvpData={rsvpByPracticeId[practice.id]}
         />
@@ -35,10 +38,12 @@ export function PracticesList({
 
 function PracticeRow({
   practice,
+  isSignedIn,
   canRsvp,
   rsvpData,
 }: {
   practice: Practice;
+  isSignedIn: boolean;
   canRsvp: boolean;
   rsvpData: RsvpData | undefined;
 }) {
@@ -74,6 +79,7 @@ function PracticeRow({
           )}
           <PracticeRsvpSummary
             practiceId={practice.id}
+            isSignedIn={isSignedIn}
             canRsvp={canRsvp}
             summary={summary}
             myStatus={myStatus}

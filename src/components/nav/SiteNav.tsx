@@ -109,7 +109,10 @@ function AuthLink({
     <Link
       href="/api/auth/signin"
       onClick={onNavigate}
-      className={clsx("text-sm text-neutral-600 hover:underline dark:text-neutral-300", className)}
+      className={clsx(
+        "rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700",
+        className,
+      )}
     >
       Login
     </Link>

@@ -24,10 +24,12 @@ function icsUrl(teamFilter: TeamFilter, protocol: "https:" | "webcal:"): string 
 
 export function PracticesSection({
   practices,
+  isSignedIn,
   canRsvp,
   rsvpByPracticeId,
 }: {
   practices: Practice[];
+  isSignedIn: boolean;
   canRsvp: boolean;
   rsvpByPracticeId: Record<string, RsvpData>;
 }) {
@@ -111,12 +113,14 @@ export function PracticesSection({
       {view === "list" ? (
         <PracticesList
           practices={filteredPractices}
+          isSignedIn={isSignedIn}
           canRsvp={canRsvp}
           rsvpByPracticeId={rsvpByPracticeId}
         />
       ) : (
         <PracticesCalendar
           practices={filteredPractices}
+          isSignedIn={isSignedIn}
           canRsvp={canRsvp}
           rsvpByPracticeId={rsvpByPracticeId}
         />

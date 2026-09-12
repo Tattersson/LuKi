@@ -14,9 +14,17 @@ async function getUpcomingPracticesOrEmpty(): Promise<Practice[]> {
   }
 }
 
+/** RSVP counts/names are only ever fetched (let alone rendered) for a signed-in
+ *  visitor - an anonymous request never even queries them, so there's nothing to leak
+ *  via the page's HTML/RSC payload either. */
 async function getRsvpDataByPracticeId(
   practices: Practice[],
+  isSignedIn: boolean,
 ): Promise<{ canRsvp: boolean; rsvpByPracticeId: Record<string, RsvpData> }> {
+  if (!isSignedIn) {
+    return { canRsvp: false, rsvpByPracticeId: {} };
+  }
+
   const session = await auth();
   const canRsvp = hasAnyRole(session, [PLAYER_ROLE_NAME]);
   const player = canRsvp ? await getCurrentPlayer() : null;
@@ -35,12 +43,20 @@ async function getRsvpDataByPracticeId(
 }
 
 export default async function PracticesPage() {
+  const session = await auth();
+  const isSignedIn = !!session?.user;
+
   const practices = await getUpcomingPracticesOrEmpty();
-  const { canRsvp, rsvpByPracticeId } = await getRsvpDataByPracticeId(practices);
+  const { canRsvp, rsvpByPracticeId } = await getRsvpDataByPracticeId(practices, isSignedIn);
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
-      <PracticesSection practices={practices} canRsvp={canRsvp} rsvpByPracticeId={rsvpByPracticeId} />
+      <PracticesSection
+        practices={practices}
+        isSignedIn={isSignedIn}
+        canRsvp={canRsvp}
+        rsvpByPracticeId={rsvpByPracticeId}
+      />
     </main>
   );
 }

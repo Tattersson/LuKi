@@ -41,17 +41,22 @@ interface RawTimeoutEntry {
   TeamId: number;
 }
 
-interface RawGkStartEntry {
-  Type: "GK_start";
+/** Covers GK_start (game-opening assignment), GK_in (goalie returns) and GK_out (pulled
+ *  for an extra attacker) - all three share this exact shape on the feed. A GK_out's own
+ *  GoalkeeperJersey/Name is the feed's "nobody in net" marker (0 / " "); the goalie who
+ *  actually left is in the Previous* fields instead. */
+interface RawGoalieEventEntry {
+  Type: "GK_start" | "GK_in" | "GK_out";
   Period: number;
   GameTime: number;
   TeamId: number;
   GoalkeeperName: string;
   GoalkeeperJersey: number;
   PreviousGoalkeeperName: string | null;
+  PreviousGoalkeeperJersey: number | null;
 }
 
-type RawGameLogEntry = RawGoalEntry | RawPenaltyEntry | RawTimeoutEntry | RawGkStartEntry;
+type RawGameLogEntry = RawGoalEntry | RawPenaltyEntry | RawTimeoutEntry | RawGoalieEventEntry;
 
 interface RawGoalkeeperSummaryTeam {
   TeamName: string;
@@ -99,7 +104,9 @@ function toNullableName(name: string | undefined | null): string | null {
   return name && name.trim() ? name : null;
 }
 
-function mapLogEntry(raw: RawGameLogEntry, index: number, periodLengthSeconds: number): GameLogEntry {
+/** Returns null for a log entry type the feed hasn't shown us before, so an unfamiliar
+ *  future event type gets dropped from the log rather than crashing the page. */
+function mapLogEntry(raw: RawGameLogEntry, index: number, periodLengthSeconds: number): GameLogEntry | null {
   const base = {
     id: `${raw.Type}_${index}`,
     period: raw.Period,
@@ -132,13 +139,18 @@ function mapLogEntry(raw: RawGameLogEntry, index: number, periodLengthSeconds: n
     case "Timeout":
       return { ...base, type: "timeout" };
     case "GK_start":
+    case "GK_in":
+    case "GK_out":
       return {
         ...base,
         type: "goalie-change",
         goalieName: raw.GoalkeeperName,
         goalieJersey: raw.GoalkeeperJersey,
         previousGoalieName: toNullableName(raw.PreviousGoalkeeperName),
+        previousGoalieJersey: raw.PreviousGoalkeeperJersey,
       };
+    default:
+      return null;
   }
 }
 
@@ -196,7 +208,10 @@ export async function fetchFullGameReport(gameId: number, season: number): Promi
   const currentPeriod = data.PeriodSummary?.PlayedPeriods ?? 0;
   const periodLengthSeconds = parsePeriodLengthSeconds(game.GameRules);
   const elapsedSeconds = toWithinPeriodSeconds(currentPeriod, game.GameTime, periodLengthSeconds);
-  const log = (data.GameLogsUpdate ?? []).map((entry, index) => mapLogEntry(entry, index, periodLengthSeconds));
+  const log = (data.GameLogsUpdate ?? []).flatMap((entry, index) => {
+    const mapped = mapLogEntry(entry, index, periodLengthSeconds);
+    return mapped ? [mapped] : [];
+  });
 
   const { home: homeGoalkeepers, away: awayGoalkeepers } = attributeGoalieStats({
     homeTeamId: game.HomeTeam.Id,

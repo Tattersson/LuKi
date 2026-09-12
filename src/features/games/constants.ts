@@ -2,6 +2,7 @@ import type { TeamKey } from "./domain/types";
 
 export const API_BASE_URL = "https://tulospalvelu.leijonat.fi/helpers/getgames";
 export const GAME_REPORT_BASE_URL = "https://tulospalvelu.leijonat.fi/gamereport/getgamereportdata";
+export const ROSTERS_BASE_URL = "https://tulospalvelu.leijonat.fi/game/helpers/getrosters";
 
 /** Front-page games list ticker (score/period summary only). */
 export const LIVE_POLL_INTERVAL_MS = 30_000;

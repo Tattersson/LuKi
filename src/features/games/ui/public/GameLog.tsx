@@ -25,6 +25,12 @@ function TeamDot({ isHome }: { isHome: boolean }) {
   );
 }
 
+/** A GK_out (pulled for an extra attacker) reports the feed's "nobody in net" marker
+ *  (jersey 0) as its own goalie - the goalie who actually left is in the previous* fields. */
+function isGoaliePulled(jersey: number): boolean {
+  return jersey === 0;
+}
+
 /** First line: who was involved, and their team. */
 function describeWho(entry: GameLogEntry, team: string): string {
   switch (entry.type) {
@@ -33,6 +39,9 @@ function describeWho(entry: GameLogEntry, team: string): string {
     case "penalty":
       return `#${entry.playerJersey} ${entry.playerName} · ${team}`;
     case "goalie-change":
+      if (isGoaliePulled(entry.goalieJersey)) {
+        return `#${entry.previousGoalieJersey} ${entry.previousGoalieName} · ${team}`;
+      }
       return `#${entry.goalieJersey} ${entry.goalieName} · ${team}`;
     case "timeout":
       return team;
@@ -50,6 +59,7 @@ function describeWhat(entry: GameLogEntry): string {
     case "timeout":
       return "Timeout";
     case "goalie-change":
+      if (isGoaliePulled(entry.goalieJersey)) return "Pulled for an extra attacker";
       return entry.previousGoalieName ? `Replaces ${entry.previousGoalieName} in goal` : "Starts in goal";
   }
 }

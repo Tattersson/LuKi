@@ -6,6 +6,8 @@ import { formatElapsed } from "../../format";
 import type { GameReportDetail } from "../../domain/types";
 import { AWAY_LOG_DOT, GameLog, HOME_LOG_DOT } from "./GameLog";
 import { GoalkeeperStats } from "./GoalkeeperStats";
+import { Referees } from "./Referees";
+import { Rosters } from "./Rosters";
 import { useGameReportDetail } from "./useGameReportDetail";
 
 const STATUS_LABEL: Record<GameReportDetail["status"], string> = {
@@ -27,7 +29,7 @@ export function GameDetailView({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-      <Link href="/" className="inline-block text-sm underline">
+      <Link href="/" className="inline-block text-sm font-semibold underline">
         ◂ Back
       </Link>
 
@@ -57,11 +59,20 @@ export function GameDetailView({
         </p>
       </div>
 
+      <Referees referees={report.referees} />
+
       <GoalkeeperStats
         homeTeamName={report.homeTeamName}
         awayTeamName={report.awayTeamName}
         homeGoalkeepers={report.homeGoalkeepers}
         awayGoalkeepers={report.awayGoalkeepers}
+      />
+
+      <Rosters
+        gameId={gameId}
+        season={season}
+        homeTeamName={report.homeTeamName}
+        awayTeamName={report.awayTeamName}
       />
 
       <Card>
@@ -91,12 +102,6 @@ export function GameDetailView({
           awayTeamName={report.awayTeamName}
         />
       </Card>
-
-      {report.referees.length > 0 && (
-        <p className="text-xs text-neutral-500">
-          Referees: {report.referees.map((referee) => referee.name).join(", ")}
-        </p>
-      )}
     </div>
   );
 }

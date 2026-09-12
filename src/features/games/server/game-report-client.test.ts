@@ -265,6 +265,66 @@ describe("fetchFullGameReport", () => {
     expect(report.homeGoalkeepers[0].timeOnIceSeconds).toBe(1467); // total elapsed, not 1467 + a whole extra period
   });
 
+  it("maps GK_out/GK_in (goalie pulled for an extra attacker, then returns) without crashing", async () => {
+    // Regression: a real finished game produced GK_out/GK_in entries (not modeled at the
+    // time), which fell through mapLogEntry's switch with no matching case and no
+    // default, returning undefined - crashing the whole page the next time something
+    // read `.type` off that "entry".
+    stubReport({
+      GamesUpdate: [baseGamesUpdate],
+      PeriodSummary: { PlayedPeriods: 3 },
+      GameLogsUpdate: [
+        {
+          Type: "GK_start",
+          Period: 1,
+          GameTime: 0,
+          TeamId: 1211191406,
+          GoalkeeperName: "JUUTI Joose",
+          GoalkeeperJersey: 1,
+          PreviousGoalkeeperName: " ",
+          PreviousGoalkeeperJersey: 0,
+        },
+        {
+          Type: "GK_out",
+          Period: 3,
+          GameTime: 3539,
+          TeamId: 1211191406,
+          GoalkeeperName: " ",
+          GoalkeeperJersey: 0,
+          PreviousGoalkeeperName: "JUUTI Joose",
+          PreviousGoalkeeperJersey: 1,
+        },
+        {
+          Type: "GK_in",
+          Period: 3,
+          GameTime: 3560,
+          TeamId: 1211191406,
+          GoalkeeperName: "JUUTI Joose",
+          GoalkeeperJersey: 1,
+          PreviousGoalkeeperName: " ",
+          PreviousGoalkeeperJersey: 0,
+        },
+      ],
+    });
+
+    const report = await fetchFullGameReport(2710919, 2027);
+
+    expect(report.log).toHaveLength(3);
+    expect(report.log.every((entry) => entry.type === "goalie-change")).toBe(true);
+    expect(report.log[1]).toMatchObject({ goalieJersey: 0, previousGoalieJersey: 1 });
+  });
+
+  it("drops a log entry type the feed hasn't shown us before instead of crashing", async () => {
+    stubReport({
+      GamesUpdate: [baseGamesUpdate],
+      PeriodSummary: { PlayedPeriods: 1 },
+      GameLogsUpdate: [{ Type: "SomeFutureEventType", Period: 1, GameTime: 10, TeamId: 1211191406 }],
+    });
+
+    const report = await fetchFullGameReport(2710919, 2027);
+    expect(report.log).toEqual([]);
+  });
+
   it("leaves derived goalie stats null when there's no GK_start data to attribute from", async () => {
     stubReport({
       GamesUpdate: [baseGamesUpdate],

@@ -102,12 +102,19 @@ export interface TimeoutLogEntry extends GameLogEntryBase {
   type: "timeout";
 }
 
+/** Covers the feed's GK_start (game-opening assignment), GK_in (returns to net) and
+ *  GK_out (pulled for an extra attacker/empty net) events - all three share the same
+ *  raw shape. A GK_out is recognizable by `goalieJersey` being 0 with a blank name (the
+ *  feed's "nobody in net" marker) - the goalie who actually left is in the `previous*`
+ *  fields instead, which the UI uses to describe it as a pull rather than an entrance. */
 export interface GoalieChangeLogEntry extends GameLogEntryBase {
   type: "goalie-change";
   goalieName: string;
   goalieJersey: number;
-  /** null when this is the starting goalie for the game, not a mid-game change. */
+  /** null when there was no goalie in net before this event (game start, or nobody was
+   *  pulled yet). */
   previousGoalieName: string | null;
+  previousGoalieJersey: number | null;
 }
 
 export type GameLogEntry = GoalLogEntry | PenaltyLogEntry | TimeoutLogEntry | GoalieChangeLogEntry;
@@ -161,4 +168,23 @@ export interface GameReportDetail {
   awayGoalkeepers: GoalkeeperStat[];
   /** Chronological, oldest first - the UI decides display order/grouping. */
   log: GameLogEntry[];
+}
+
+/** Fetched separately (see server/roster-client.ts) and only on demand - rosters don't
+ *  change during a game, so there's no reason to include them in the polled report. */
+export interface RosterPlayer {
+  jersey: string;
+  name: string;
+  /** Finnish position abbreviation as given by the feed (e.g. "MV", "KH", "VP"). */
+  position: string;
+  captain: "C" | "A" | null;
+  /** Line number (1st line, 2nd line, ...) as assigned by the feed. Goalies also carry
+   *  one (1 = starter, 2 = backup, ...), separate from the forward/defence line numbering.
+   *  null if the feed didn't provide one. */
+  line: number | null;
+}
+
+export interface GameRosters {
+  home: RosterPlayer[];
+  away: RosterPlayer[];
 }

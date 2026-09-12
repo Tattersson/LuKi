@@ -23,6 +23,7 @@ function goalieChange(overrides: Partial<GoalieChangeLogEntry>): GoalieChangeLog
     goalieName: "Goalie",
     goalieJersey: 1,
     previousGoalieName: null,
+    previousGoalieJersey: null,
     ...overrides,
   };
 }

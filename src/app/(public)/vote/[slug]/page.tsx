@@ -17,7 +17,7 @@ export default async function VotePage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-12">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12">
       <Card>
         <h1 className="mb-1 text-xl font-semibold">{election.title}</h1>
         {election.description && (

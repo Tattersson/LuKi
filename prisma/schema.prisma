@@ -134,3 +134,59 @@ model OtpSendLog {
   @@index([electionId, emailHash, createdAt])
   @@index([ipHash, createdAt])
 }
+
+enum PlayerPosition {
+  MV // Maalivahti (Goalkeeper)
+  FW // Forward
+  D // Defenseman
+}
+
+enum StickSide {
+  LEFT
+  RIGHT
+}
+
+/// Created only once a registrant has verified their email via the self-service
+/// registration flow (see the `players` feature) - there is no unverified draft state.
+model Player {
+  id              String         @id @default(cuid())
+  firstName       String
+  lastName        String
+  position        PlayerPosition
+  heightCm        Int
+  weightKg        Int
+  stickSide       StickSide
+  birthDate       DateTime
+  email           String         @unique
+  emailVerifiedAt DateTime
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+/// Standalone email-verification OTP for self-service player registration. Unlike
+/// voting's OtpRequest, this isn't scoped to any parent entity - there is one general
+/// registration link, not one per player, so a Player row doesn't exist yet when this
+/// is created.
+model PlayerOtpRequest {
+  id          String    @id @default(cuid())
+  emailHash   String
+  otpHash     String
+  expiresAt   DateTime
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  consumedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([emailHash, consumedAt, expiresAt])
+}
+
+/// Rate-limit bookkeeping only.
+model PlayerOtpSendLog {
+  id        String   @id @default(cuid())
+  emailHash String
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  @@index([emailHash, createdAt])
+  @@index([ipHash, createdAt])
+}

@@ -21,9 +21,14 @@ export default async function AdminLayout({
       )}
       <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <Link href="/admin" className="font-semibold">
-            Voting admin
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/admin" className="font-semibold">
+              Voting admin
+            </Link>
+            <Link href="/admin/players" className="text-sm text-neutral-500 hover:underline">
+              Players
+            </Link>
+          </div>
           <div className="flex items-center gap-3 text-sm text-neutral-500">
             <span>{session.user?.email}</span>
             {!bypassed && (

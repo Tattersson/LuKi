@@ -2,14 +2,10 @@ import { randomInt } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getMailer } from "@/lib/mailer";
+import { renderOtpEmail } from "@/lib/mailer/templates/otp-email";
 import { hmacEquals, hmacHex } from "@/lib/security/hmac";
 import { OTP_LENGTH, OTP_TTL_MINUTES } from "../constants";
-import {
-  InvalidOrExpiredOtpError,
-  InvalidOtpError,
-  TooManyAttemptsError,
-} from "../domain/errors";
-import { renderOtpEmail } from "@/lib/mailer/templates/otp-email";
+import { InvalidOrExpiredOtpError, InvalidOtpError, TooManyAttemptsError } from "../domain/errors";
 import { assertOtpSendAllowed } from "./rate-limit";
 
 function generateOtpCode(): string {
@@ -29,30 +25,24 @@ function otpMatches(code: string, expectedHash: string): boolean {
   return hmacEquals(secret, code, expectedHash);
 }
 
-/** Sends a fresh OTP for (electionId, email), after rate-limit checks. Never call this
- *  if the email has already voted - callers must check VotedEmail first. */
-export async function sendOtp(params: {
-  electionId: string;
+/** Sends a fresh OTP for this email, after rate-limit checks. Never call this if the
+ *  email already belongs to a registered player - callers must check that first. */
+export async function sendPlayerOtp(params: {
   email: string;
   emailHash: string;
   ipHash: string;
-  electionTitle: string;
 }): Promise<void> {
-  const { electionId, email, emailHash, ipHash, electionTitle } = params;
+  const { email, emailHash, ipHash } = params;
 
-  await assertOtpSendAllowed({ electionId, emailHash, ipHash });
+  await assertOtpSendAllowed({ emailHash, ipHash });
 
   const code = generateOtpCode();
   const otpHash = hashOtp(code);
   const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
 
   await prisma.$transaction([
-    prisma.otpRequest.create({
-      data: { electionId, emailHash, otpHash, expiresAt },
-    }),
-    prisma.otpSendLog.create({
-      data: { electionId, emailHash, ipHash },
-    }),
+    prisma.playerOtpRequest.create({ data: { emailHash, otpHash, expiresAt } }),
+    prisma.playerOtpSendLog.create({ data: { emailHash, ipHash } }),
   ]);
 
   const mailer = getMailer();
@@ -60,39 +50,33 @@ export async function sendOtp(params: {
     renderOtpEmail({
       to: email,
       code,
-      subject: `Your verification code for "${electionTitle}"`,
-      contextLine: `You're verifying your email to vote in "${electionTitle}".`,
+      subject: "Your verification code to create your player card",
+      contextLine: "You're verifying your email to create your player card.",
       ttlMinutes: OTP_TTL_MINUTES,
     }),
   );
 }
 
 /**
- * Checks the OTP code within an existing transaction, enforcing expiry and the
- * attempt limit the same way regardless of caller. Throws
- * InvalidOrExpiredOtpError / TooManyAttemptsError / InvalidOtpError.
+ * Checks the OTP code within an existing transaction, enforcing expiry and the attempt
+ * limit the same way regardless of caller. Throws InvalidOrExpiredOtpError /
+ * TooManyAttemptsError / InvalidOtpError.
  *
- * `consume: false` (used by the standalone "verify code" screen) leaves the
- * OTP request usable so the later vote-casting step can check it again -
- * a correct code never increments `attempts`, so checking it twice is free.
- * `consume: true` marks it used so it can't be replayed, and must run in the
- * same transaction as the VotedEmail/Vote writes so eligibility-check-and-cast
- * is atomic.
+ * `consume: false` (used by the standalone "verify code" screen) leaves the OTP request
+ * usable so the later registration-completion step can check it again - a correct code
+ * never increments `attempts`, so checking it twice is free. `consume: true` marks it
+ * used so it can't be replayed, and must run in the same transaction as the Player
+ * creation so verify-and-create is atomic.
  */
 async function checkOtpCode(
   tx: Prisma.TransactionClient | PrismaClient,
-  params: { electionId: string; emailHash: string; otpCode: string },
+  params: { emailHash: string; otpCode: string },
   options: { consume: boolean },
 ): Promise<void> {
-  const { electionId, emailHash, otpCode } = params;
+  const { emailHash, otpCode } = params;
 
-  const otpRequest = await tx.otpRequest.findFirst({
-    where: {
-      electionId,
-      emailHash,
-      consumedAt: null,
-      expiresAt: { gt: new Date() },
-    },
+  const otpRequest = await tx.playerOtpRequest.findFirst({
+    where: { emailHash, consumedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -101,7 +85,7 @@ async function checkOtpCode(
   }
 
   if (otpRequest.attempts >= otpRequest.maxAttempts) {
-    await tx.otpRequest.update({
+    await tx.playerOtpRequest.update({
       where: { id: otpRequest.id },
       data: { expiresAt: new Date() },
     });
@@ -109,7 +93,7 @@ async function checkOtpCode(
   }
 
   if (!otpMatches(otpCode, otpRequest.otpHash)) {
-    await tx.otpRequest.update({
+    await tx.playerOtpRequest.update({
       where: { id: otpRequest.id },
       data: { attempts: { increment: 1 } },
     });
@@ -118,7 +102,7 @@ async function checkOtpCode(
   }
 
   if (options.consume) {
-    await tx.otpRequest.update({
+    await tx.playerOtpRequest.update({
       where: { id: otpRequest.id },
       data: { consumedAt: new Date() },
     });
@@ -128,15 +112,15 @@ async function checkOtpCode(
 /** Validates a code without consuming it - used by the standalone verification step. */
 export async function checkOtpInTransaction(
   tx: Prisma.TransactionClient | PrismaClient,
-  params: { electionId: string; emailHash: string; otpCode: string },
+  params: { emailHash: string; otpCode: string },
 ): Promise<void> {
   return checkOtpCode(tx, params, { consume: false });
 }
 
-/** Validates a code and marks it consumed - used inside the vote-casting transaction. */
+/** Validates a code and marks it consumed - used inside the player-creation transaction. */
 export async function verifyOtpInTransaction(
   tx: Prisma.TransactionClient | PrismaClient,
-  params: { electionId: string; emailHash: string; otpCode: string },
+  params: { emailHash: string; otpCode: string },
 ): Promise<void> {
   return checkOtpCode(tx, params, { consume: true });
 }

@@ -7,7 +7,7 @@ import {
   InvalidCandidateError,
 } from "../domain/errors";
 import { MAX_VICE_CAPTAIN_VOTES } from "../constants";
-import { hashEmail, normalizeEmail } from "./email-hash";
+import { hashEmail, normalizeEmail } from "@/lib/security/email-hash";
 import { checkOtpInTransaction, sendOtp, verifyOtpInTransaction } from "./otp-service";
 
 /**

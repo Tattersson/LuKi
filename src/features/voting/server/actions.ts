@@ -12,7 +12,7 @@ import {
   manualTieBreakerSchema,
 } from "../validation/schemas";
 import { requestVoteOtp, verifyVoteOtp, verifyOtpAndCastVote } from "./vote-service";
-import { hashIp } from "./email-hash";
+import { hashIp } from "@/lib/security/email-hash";
 import {
   addCandidateToElection,
   createElection,

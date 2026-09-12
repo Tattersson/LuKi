@@ -40,3 +40,17 @@ export async function updatePlayer(params: {
 
   return prisma.player.update({ where: { id: playerId }, data });
 }
+
+/** Deletes the player's own row - PracticeRsvp rows cascade (see the onDelete:
+ *  Cascade relation in schema.prisma), no manual cleanup needed there. */
+export async function deletePlayer(playerId: string): Promise<void> {
+  const existing = await prisma.player.findUnique({
+    where: { id: playerId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new PlayerNotFoundError();
+  }
+
+  await prisma.player.delete({ where: { id: playerId } });
+}

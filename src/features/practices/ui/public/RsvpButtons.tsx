@@ -22,11 +22,13 @@ export function RsvpButtons({
   canRsvp,
   myStatus,
   size = "md",
+  fullWidth = false,
 }: {
   practiceId: string;
   canRsvp: boolean;
   myStatus: RsvpStatus | null;
   size?: "md" | "lg";
+  fullWidth?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -53,6 +55,7 @@ export function RsvpButtons({
         className={clsx(
           "inline-flex items-center justify-center rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800",
           SIZE_CLASSES[size],
+          fullWidth && "flex w-full",
         )}
       >
         Login to RSVP
@@ -63,13 +66,14 @@ export function RsvpButtons({
   const sizeClasses = SIZE_CLASSES[size];
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
+    <div className={clsx("flex flex-col gap-1", fullWidth && "w-full")}>
+      <div className={clsx("flex items-center gap-2", fullWidth && "w-full")}>
         <Button
           type="button"
           variant="success"
           className={clsx(
             sizeClasses,
+            fullWidth && "flex-1",
             myStatus === "IN" && "ring-2 ring-green-900 ring-offset-2 dark:ring-green-300 dark:ring-offset-neutral-900",
           )}
           disabled={pending}
@@ -82,6 +86,7 @@ export function RsvpButtons({
           variant="danger"
           className={clsx(
             sizeClasses,
+            fullWidth && "flex-1",
             myStatus === "OUT" && "ring-2 ring-red-900 ring-offset-2 dark:ring-red-300 dark:ring-offset-neutral-900",
           )}
           disabled={pending}

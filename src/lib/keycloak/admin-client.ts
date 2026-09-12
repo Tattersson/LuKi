@@ -184,6 +184,16 @@ export async function assignRealmRole(userId: string, roleName: string): Promise
   }
 }
 
+/** Deletes the Keycloak user, revoking their login entirely. A 404 (already gone -
+ *  e.g. deleted directly in Keycloak, or a retry after a partial failure) is treated
+ *  as success rather than an error, since the end state either way is "no account". */
+export async function deleteKeycloakUser(userId: string): Promise<void> {
+  const response = await keycloakAdminFetch(`/users/${userId}`, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    throw new KeycloakAdminError(`Failed to delete Keycloak user (${await describeError(response)})`);
+  }
+}
+
 /** Keycloak sends its own branded email with a secure, time-limited action-token
  *  link - no custom token/email flow needed on our side. */
 export async function sendExecuteActionsEmail(

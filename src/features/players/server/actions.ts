@@ -13,8 +13,9 @@ import {
   verifyPlayerRegistrationOtp,
   completePlayerRegistration,
 } from "./registration-service";
-import { getPlayerById, updatePlayer } from "./player-repository";
+import { deletePlayer, getPlayerById, updatePlayer } from "./player-repository";
 import { provisionPlayerKeycloakAccount } from "./keycloak-provisioning";
+import { deleteKeycloakUser } from "@/lib/keycloak/admin-client";
 import { hashIp } from "@/lib/security/email-hash";
 import { requireAdmin } from "@/lib/auth/rbac";
 import {
@@ -137,6 +138,41 @@ export async function createPlayerLoginAction(
       error: "Could not create a login for this player. Check Keycloak connectivity and try again.",
     };
   }
+}
+
+/** Deletes the player's Keycloak login first, then their player card. If the
+ *  Keycloak deletion fails, the player card is deliberately left in place - a "delete"
+ *  that removed the DB row but left a live Keycloak login behind would silently fail
+ *  the "also remove Keycloak access" half of this action, so the admin needs to see
+ *  the error and retry rather than get a false success. */
+export async function deletePlayerAction(playerId: string): Promise<ActionResult<{ id: string }>> {
+  await requireAdmin();
+
+  const player = await getPlayerById(playerId);
+  if (!player) {
+    return { ok: false, error: "Player not found." };
+  }
+
+  if (player.keycloakId) {
+    try {
+      await deleteKeycloakUser(player.keycloakId);
+    } catch (error) {
+      console.error(error);
+      return {
+        ok: false,
+        error: "Could not remove this player's Keycloak login. Check Keycloak connectivity and try again.",
+      };
+    }
+  }
+
+  try {
+    await deletePlayer(playerId);
+  } catch (error) {
+    return toErrorResult(error);
+  }
+
+  revalidatePath("/admin/players");
+  return { ok: true, data: { id: playerId } };
 }
 
 function toErrorResult(error: unknown): {

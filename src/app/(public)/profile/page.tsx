@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { auth } from "@/lib/auth/auth";
@@ -24,23 +25,22 @@ export default async function ProfilePage() {
     );
   }
 
+  // Logged in but no linked player card at all (e.g. a Keycloak account created
+  // outside the self-service flow, or one that never finished it) - send them to
+  // register rather than dead-ending on a "contact an admin" message, since
+  // completing registration is a self-service fix (it creates the player card and,
+  // for an existing Keycloak account, re-links + assigns the player role to it).
+  const player = await getCurrentPlayer();
+  if (!player) {
+    redirect("/players/register");
+  }
+
   if (!hasAnyRole(session, [PLAYER_ROLE_NAME])) {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
         <Alert variant="error">
-          Your account doesn&apos;t have player access yet. Contact an admin if you believe this is
-          a mistake.
-        </Alert>
-      </main>
-    );
-  }
-
-  const player = await getCurrentPlayer();
-  if (!player) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-        <Alert variant="error">
-          We couldn&apos;t find a player record linked to your account. Contact an admin.
+          Your player role hasn&apos;t taken effect on this session yet - try signing out and back
+          in. Contact an admin if that doesn&apos;t help.
         </Alert>
       </main>
     );

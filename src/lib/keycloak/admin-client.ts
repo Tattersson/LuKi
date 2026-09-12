@@ -112,12 +112,16 @@ export async function getKeycloakUserById(userId: string): Promise<KeycloakUserS
   };
 }
 
-export async function findKeycloakUserByEmail(email: string): Promise<{ id: string } | null> {
+/** Looks a user up by username rather than the email query param - every Keycloak
+ *  user this app creates has its username set equal to the player's email (see
+ *  createKeycloakUser below), so this is the reliable way to find "the Keycloak user
+ *  for this player's registered email" given only that email. */
+export async function findKeycloakUserByUsername(username: string): Promise<{ id: string } | null> {
   const response = await keycloakAdminFetch(
-    `/users?email=${encodeURIComponent(email)}&exact=true`,
+    `/users?username=${encodeURIComponent(username)}&exact=true`,
   );
   if (!response.ok) {
-    throw new KeycloakAdminError(`Failed to look up Keycloak user by email (${await describeError(response)})`);
+    throw new KeycloakAdminError(`Failed to look up Keycloak user by username (${await describeError(response)})`);
   }
   const users = (await response.json()) as Array<{ id: string }>;
   return users[0] ?? null;
@@ -154,7 +158,7 @@ export async function createKeycloakUser(params: {
   }
 
   if (response.status === 409) {
-    const existing = await findKeycloakUserByEmail(params.email);
+    const existing = await findKeycloakUserByUsername(params.email);
     if (existing) {
       return { id: existing.id, alreadyExisted: true };
     }

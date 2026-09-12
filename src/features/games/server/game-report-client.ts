@@ -1,41 +1,234 @@
 import { GAME_REPORT_BASE_URL } from "../constants";
 import { LeijonatApiError } from "../domain/errors";
-import type { LiveGameReport } from "../domain/types";
+import type {
+  GameLogEntry,
+  GameReportDetail,
+  GoalkeeperSavesStat,
+  LiveGameReport,
+} from "../domain/types";
+import { attributeGoalieStats, parsePeriodLengthSeconds, toWithinPeriodSeconds } from "./goalie-stats";
 import { deriveGameStatus } from "./leijonat-client";
+
+interface RawGoalEntry {
+  Type: "Goal";
+  Period: number;
+  GameTime: number;
+  TeamId: number;
+  ScorerName: string;
+  ScorerJersey: number;
+  FirstAssistName?: string;
+  SecondAssistName?: string;
+  HomeTeamGoals: number;
+  AwayTeamGoals: number;
+  GoalType: string;
+}
+
+interface RawPenaltyEntry {
+  Type: "Penalty";
+  Period: number;
+  GameTime: number;
+  TeamId: number;
+  Name: string;
+  Jersey: number;
+  PenaltyMinutes: string;
+  PenaltyReasonsEN: string;
+}
+
+interface RawTimeoutEntry {
+  Type: "Timeout";
+  Period: number;
+  GameTime: number;
+  TeamId: number;
+}
+
+interface RawGkStartEntry {
+  Type: "GK_start";
+  Period: number;
+  GameTime: number;
+  TeamId: number;
+  GoalkeeperName: string;
+  GoalkeeperJersey: number;
+  PreviousGoalkeeperName: string | null;
+}
+
+type RawGameLogEntry = RawGoalEntry | RawPenaltyEntry | RawTimeoutEntry | RawGkStartEntry;
+
+interface RawGoalkeeperSummaryTeam {
+  TeamName: string;
+  TeamGoalkeepers: Array<{
+    GkName: string;
+    GkJersey: number;
+    GkSaves: Array<{ Period: number; Saves: number }>;
+  }>;
+}
 
 interface LeijonatGameReportResponse {
   GamesUpdate: Array<{
     Id: number;
     GameTime: number;
-    HomeTeam: { Goals: number };
-    AwayTeam: { Goals: number };
+    Arena: string;
+    StartDate: string;
+    StartTime: string;
+    SubSerieName: string;
+    LevelName: string;
+    HomeTeam: { Name: string; Goals: number; Id: number };
+    AwayTeam: { Name: string; Goals: number; Id: number };
     GameStatus: number;
     FinishedType: number;
+    GameRules: string;
   }>;
+  GameLogsUpdate?: RawGameLogEntry[];
   PeriodSummary?: { PlayedPeriods: number };
+  GoalkeeperSummary?: RawGoalkeeperSummaryTeam[];
+  Referees?: Array<{ RefereeRole: string; RefereeName: string }>;
 }
 
-export async function fetchGameReport(gameId: number, season: number): Promise<LiveGameReport> {
+/** Known GoalType codes seen on the live feed; anything else is shown as-is rather
+ *  than silently dropped. */
+const GOAL_SITUATION_LABELS: Record<string, string> = {
+  YV: "Power play",
+  AV: "Shorthanded",
+};
+
+function toGoalSituation(goalType: string): string | null {
+  if (!goalType) return null;
+  return GOAL_SITUATION_LABELS[goalType] ?? goalType;
+}
+
+function toNullableName(name: string | undefined | null): string | null {
+  return name && name.trim() ? name : null;
+}
+
+function mapLogEntry(raw: RawGameLogEntry, index: number, periodLengthSeconds: number): GameLogEntry {
+  const base = {
+    id: `${raw.Type}_${index}`,
+    period: raw.Period,
+    gameTime: toWithinPeriodSeconds(raw.Period, raw.GameTime, periodLengthSeconds),
+    teamId: raw.TeamId,
+  };
+
+  switch (raw.Type) {
+    case "Goal":
+      return {
+        ...base,
+        type: "goal",
+        scorerName: raw.ScorerName,
+        scorerJersey: raw.ScorerJersey,
+        assist1Name: toNullableName(raw.FirstAssistName),
+        assist2Name: toNullableName(raw.SecondAssistName),
+        homeGoals: raw.HomeTeamGoals,
+        awayGoals: raw.AwayTeamGoals,
+        situation: toGoalSituation(raw.GoalType),
+      };
+    case "Penalty":
+      return {
+        ...base,
+        type: "penalty",
+        playerName: raw.Name,
+        playerJersey: raw.Jersey,
+        minutesLabel: raw.PenaltyMinutes,
+        reason: raw.PenaltyReasonsEN,
+      };
+    case "Timeout":
+      return { ...base, type: "timeout" };
+    case "GK_start":
+      return {
+        ...base,
+        type: "goalie-change",
+        goalieName: raw.GoalkeeperName,
+        goalieJersey: raw.GoalkeeperJersey,
+        previousGoalieName: toNullableName(raw.PreviousGoalkeeperName),
+      };
+  }
+}
+
+function toGoalkeeperStats(team: RawGoalkeeperSummaryTeam): GoalkeeperSavesStat[] {
+  return team.TeamGoalkeepers.map((gk) => ({
+    name: gk.GkName,
+    jersey: gk.GkJersey,
+    totalSaves: gk.GkSaves.find((s) => s.Period === 0)?.Saves ?? 0,
+    savesByPeriod: gk.GkSaves.filter((s) => s.Period !== 0).map((s) => ({
+      period: s.Period,
+      saves: s.Saves,
+    })),
+  }));
+}
+
+async function fetchRawGameReport(gameId: number, season: number): Promise<LeijonatGameReportResponse> {
   const url = new URL(GAME_REPORT_BASE_URL);
   url.searchParams.set("gameid", String(gameId));
   url.searchParams.set("season", String(season));
 
-  // Always fresh: this is only called (via the live-report route) for games the schedule
-  // already flagged as live, on a short client-side polling cadence.
+  // Always fresh: this is only called on a short client-side polling cadence, for
+  // games already known (or about) to be live.
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     throw new LeijonatApiError(response.status);
   }
 
-  const data: LeijonatGameReportResponse = await response.json();
+  return response.json();
+}
+
+export async function fetchGameReport(gameId: number, season: number): Promise<LiveGameReport> {
+  const data = await fetchRawGameReport(gameId, season);
   const game = data.GamesUpdate[0];
+  const currentPeriod = data.PeriodSummary?.PlayedPeriods ?? 0;
+  const periodLengthSeconds = parsePeriodLengthSeconds(game.GameRules);
 
   return {
     gameId: game.Id,
     status: deriveGameStatus(game.GameStatus, game.FinishedType),
     homeGoals: game.HomeTeam.Goals,
     awayGoals: game.AwayTeam.Goals,
-    currentPeriod: data.PeriodSummary?.PlayedPeriods ?? 0,
-    elapsedSeconds: game.GameTime,
+    currentPeriod,
+    elapsedSeconds: toWithinPeriodSeconds(currentPeriod, game.GameTime, periodLengthSeconds),
+  };
+}
+
+export async function fetchFullGameReport(gameId: number, season: number): Promise<GameReportDetail> {
+  const data = await fetchRawGameReport(gameId, season);
+  const game = data.GamesUpdate[0];
+
+  const goalkeeperTeams = data.GoalkeeperSummary ?? [];
+  const homeGoalkeeperTeam = goalkeeperTeams.find((t) => t.TeamName === game.HomeTeam.Name);
+  const awayGoalkeeperTeam = goalkeeperTeams.find((t) => t.TeamName === game.AwayTeam.Name);
+
+  const currentPeriod = data.PeriodSummary?.PlayedPeriods ?? 0;
+  const periodLengthSeconds = parsePeriodLengthSeconds(game.GameRules);
+  const elapsedSeconds = toWithinPeriodSeconds(currentPeriod, game.GameTime, periodLengthSeconds);
+  const log = (data.GameLogsUpdate ?? []).map((entry, index) => mapLogEntry(entry, index, periodLengthSeconds));
+
+  const { home: homeGoalkeepers, away: awayGoalkeepers } = attributeGoalieStats({
+    homeTeamId: game.HomeTeam.Id,
+    awayTeamId: game.AwayTeam.Id,
+    periodLengthSeconds,
+    currentPeriod,
+    elapsedSeconds,
+    log,
+    homeGoalkeepers: homeGoalkeeperTeam ? toGoalkeeperStats(homeGoalkeeperTeam) : [],
+    awayGoalkeepers: awayGoalkeeperTeam ? toGoalkeeperStats(awayGoalkeeperTeam) : [],
+  });
+
+  return {
+    gameId: game.Id,
+    season,
+    homeTeamId: game.HomeTeam.Id,
+    awayTeamId: game.AwayTeam.Id,
+    homeTeamName: game.HomeTeam.Name,
+    awayTeamName: game.AwayTeam.Name,
+    homeGoals: game.HomeTeam.Goals,
+    awayGoals: game.AwayTeam.Goals,
+    status: deriveGameStatus(game.GameStatus, game.FinishedType),
+    currentPeriod,
+    elapsedSeconds,
+    rinkName: game.Arena,
+    startDate: game.StartDate,
+    startTime: game.StartTime,
+    levelName: game.LevelName,
+    subSerieName: game.SubSerieName,
+    referees: (data.Referees ?? []).map((r) => ({ role: r.RefereeRole, name: r.RefereeName })),
+    homeGoalkeepers,
+    awayGoalkeepers,
+    log,
   };
 }

@@ -3,7 +3,11 @@ import type { TeamKey } from "./domain/types";
 export const API_BASE_URL = "https://tulospalvelu.leijonat.fi/helpers/getgames";
 export const GAME_REPORT_BASE_URL = "https://tulospalvelu.leijonat.fi/gamereport/getgamereportdata";
 
+/** Front-page games list ticker (score/period summary only). */
 export const LIVE_POLL_INTERVAL_MS = 30_000;
+/** Game detail page (full log/stats) - polled more often since it's the focused view
+ *  someone opens specifically to follow a game closely. */
+export const GAME_DETAIL_POLL_INTERVAL_MS = 5_000;
 
 export const TEAMS: Record<TeamKey, { teamId: number; subSerieId: number; label: string }> = {
   "luki-2div": { teamId: 1211191406, subSerieId: 201, label: "LuKi II.Div" },

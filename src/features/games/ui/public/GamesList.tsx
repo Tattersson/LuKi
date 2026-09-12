@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import {
   AWAY_GAME_BACKGROUND,
@@ -11,13 +12,8 @@ import {
   SAME_DAY_BADGE,
   TEAM_COLORS,
 } from "../../constants";
+import { formatElapsed } from "../../format";
 import type { LiveGameReport, TeamGame } from "../../domain/types";
-
-function formatElapsed(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
 
 export function GamesList({
   games,
@@ -54,65 +50,68 @@ function GameRow({ game, liveReport }: { game: TeamGame; liveReport?: LiveGameRe
   const awayGoals = liveReport?.awayGoals ?? game.awayGoals;
 
   return (
-    <li
-      className="relative rounded-lg px-3 py-3"
-      style={{ backgroundColor: background, color: textColor }}
-    >
-      {status === "live" && (
-        <span
-          className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 ring-2 ring-white"
-          title="Live now"
-          aria-label="Live now"
-        />
-      )}
-      <div className="flex items-start gap-3">
-        <span
-          className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: dotColor, border: "1px solid rgba(0,0,0,0.35)" }}
-          aria-hidden
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="font-bold">
-              {homeTeamName} vs {awayTeamName}
-            </span>
-            <span className="text-sm" style={{ color: mutedTextColor }}>
-              {format(parseISO(game.dateISO), "EEE d MMM yyyy")}
-              {game.time ? ` · ${game.time.slice(0, 5)}` : ""}
-            </span>
-          </div>
-
-          {status !== "upcoming" && (
-            <div className="mt-1 flex items-center gap-2 text-sm font-semibold">
-              <span>
-                {homeGoals} – {awayGoals}
+    <li>
+      <Link
+        href={`/games/${game.id}?season=${game.season}`}
+        className="relative block rounded-lg px-3 py-3 transition-opacity hover:opacity-90"
+        style={{ backgroundColor: background, color: textColor }}
+      >
+        {status === "live" && (
+          <span
+            className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 ring-2 ring-white"
+            title="Live now"
+            aria-label="Live now"
+          />
+        )}
+        <div className="flex items-start gap-3">
+          <span
+            className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: dotColor, border: "1px solid rgba(0,0,0,0.35)" }}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="font-bold">
+                {homeTeamName} vs {awayTeamName}
               </span>
-              {status === "live" && (
-                <span className="rounded bg-red-500 px-1.5 py-0.5 text-xs font-medium text-white">
-                  {liveReport
-                    ? `Period ${liveReport.currentPeriod} · ${formatElapsed(liveReport.elapsedSeconds)}`
-                    : "Live"}
-                </span>
-              )}
+              <span className="text-sm" style={{ color: mutedTextColor }}>
+                {format(parseISO(game.dateISO), "EEE d MMM yyyy")}
+                {game.time ? ` · ${game.time.slice(0, 5)}` : ""}
+              </span>
             </div>
-          )}
 
-          <div className="mt-1 text-base font-medium">{game.rinkName}</div>
+            {status !== "upcoming" && (
+              <div className="mt-1 flex items-center gap-2 text-sm font-semibold">
+                <span>
+                  {homeGoals} – {awayGoals}
+                </span>
+                {status === "live" && (
+                  <span className="rounded bg-red-500 px-1.5 py-0.5 text-xs font-medium text-white">
+                    {liveReport
+                      ? `Period ${liveReport.currentPeriod} · ${formatElapsed(liveReport.elapsedSeconds)}`
+                      : "Live"}
+                  </span>
+                )}
+              </div>
+            )}
 
-          {game.conflict && (
-            <span
-              className="mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-medium"
-              style={{
-                backgroundColor:
-                  game.conflict === "overlap" ? OVERLAP_BADGE.background : SAME_DAY_BADGE.background,
-                color: game.conflict === "overlap" ? OVERLAP_BADGE.text : SAME_DAY_BADGE.text,
-              }}
-            >
-              {game.conflict === "overlap" ? "Overlaps with the other team" : "Game on same day"}
-            </span>
-          )}
+            <div className="mt-1 text-base font-medium">{game.rinkName}</div>
+
+            {game.conflict && (
+              <span
+                className="mt-2 inline-block rounded px-1.5 py-0.5 text-xs font-medium"
+                style={{
+                  backgroundColor:
+                    game.conflict === "overlap" ? OVERLAP_BADGE.background : SAME_DAY_BADGE.background,
+                  color: game.conflict === "overlap" ? OVERLAP_BADGE.text : SAME_DAY_BADGE.text,
+                }}
+              >
+                {game.conflict === "overlap" ? "Overlaps with the other team" : "Game on same day"}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      </Link>
     </li>
   );
 }

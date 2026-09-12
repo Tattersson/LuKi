@@ -25,6 +25,10 @@ export async function getCurrentPlayer(): Promise<Player | null> {
       await prisma.player
         .update({ where: { id: byEmail.id }, data: { keycloakId } })
         .catch(() => {});
+      // Reflect the just-written id rather than returning the pre-update snapshot -
+      // callers (e.g. the Keycloak-link status shown on the profile page) would
+      // otherwise see the stale/null keycloakId for the rest of this request.
+      return { ...byEmail, keycloakId };
     }
     return byEmail;
   }

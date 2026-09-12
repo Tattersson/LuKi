@@ -23,7 +23,7 @@ function optionalMeasurement(min: number, max: number) {
   );
 }
 
-const playerDetailsSchema = z.object({
+export const playerDetailsSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   position: z.enum(["MV", "FW", "D"]),

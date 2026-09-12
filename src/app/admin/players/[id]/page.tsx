@@ -6,7 +6,7 @@ import { getPlayerById } from "@/features/players/server/player-repository";
 import { getPlayerKeycloakStatus } from "@/features/players/server/keycloak-status";
 import { CreatePlayerLoginButton } from "@/features/players/ui/admin/CreatePlayerLoginButton";
 import { DeletePlayerButton } from "@/features/players/ui/admin/DeletePlayerButton";
-import { PlayerKeycloakStatus } from "@/features/players/ui/admin/PlayerKeycloakStatus";
+import { PlayerKeycloakStatus } from "@/features/players/ui/PlayerKeycloakStatus";
 import { POSITION_LABELS, STICK_SIDE_LABELS } from "@/features/players/constants";
 
 export default async function PlayerDetailPage({

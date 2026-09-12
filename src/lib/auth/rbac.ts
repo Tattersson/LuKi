@@ -48,10 +48,19 @@ export async function requireAdmin() {
 
 /** For nav rendering only - never redirects/throws, since a rendering decision must
  *  not blow up the page. */
-export async function getNavAuthState(): Promise<{ isSignedIn: boolean; showAdminLink: boolean }> {
+export async function getNavAuthState(): Promise<{
+  isSignedIn: boolean;
+  showAdminLink: boolean;
+  showProfileLink: boolean;
+}> {
   if (isAdminAuthBypassEnabled()) {
-    return { isSignedIn: true, showAdminLink: true };
+    // The bypass simulates an admin session, not a player, so no Profile link.
+    return { isSignedIn: true, showAdminLink: true, showProfileLink: false };
   }
   const session = await auth();
-  return { isSignedIn: !!session?.user, showAdminLink: hasAdminAccess(session) };
+  return {
+    isSignedIn: !!session?.user,
+    showAdminLink: hasAdminAccess(session),
+    showProfileLink: hasAnyRole(session, [PLAYER_ROLE_NAME]),
+  };
 }

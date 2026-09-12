@@ -6,6 +6,7 @@ import {
   requestPlayerOtpSchema,
   verifyPlayerOtpSchema,
   completePlayerRegistrationSchema,
+  playerDetailsSchema,
   updatePlayerSchema,
 } from "../validation/schemas";
 import {
@@ -15,9 +16,11 @@ import {
 } from "./registration-service";
 import { deletePlayer, getPlayerById, updatePlayer } from "./player-repository";
 import { provisionPlayerKeycloakAccount } from "./keycloak-provisioning";
+import { getCurrentPlayer } from "./current-player";
 import { deleteKeycloakUser } from "@/lib/keycloak/admin-client";
 import { hashIp } from "@/lib/security/email-hash";
-import { requireAdmin } from "@/lib/auth/rbac";
+import { auth } from "@/lib/auth/auth";
+import { hasAnyRole, PLAYER_ROLE_NAME, requireAdmin } from "@/lib/auth/rbac";
 import {
   EmailAlreadyRegisteredError,
   InvalidOrExpiredOtpError,
@@ -111,6 +114,44 @@ export async function updatePlayerAction(
   revalidatePath("/admin/players");
   revalidatePath(`/admin/players/${parsed.data.playerId}`);
   return { ok: true, data: { id: parsed.data.playerId } };
+}
+
+/** Updates the CURRENTLY SIGNED-IN player's own row. Unlike updatePlayerAction, this
+ *  is reachable by any authenticated player (not just admins/managers), so the target
+ *  player id is deliberately NEVER taken from client input - it is always resolved
+ *  server-side from the session via getCurrentPlayer(). Accepting a client-supplied
+ *  playerId here would let any signed-in player edit any OTHER player's record simply
+ *  by passing a different id (an IDOR vulnerability), so playerDetailsSchema (which has
+ *  no playerId field) is used instead of updatePlayerSchema. */
+export async function updateOwnPlayerAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const session = await auth();
+  if (!session?.user) {
+    return { ok: false, error: "Please sign in to update your profile." };
+  }
+  if (!hasAnyRole(session, [PLAYER_ROLE_NAME])) {
+    return { ok: false, error: "Your account isn't set up as a player yet." };
+  }
+
+  const player = await getCurrentPlayer();
+  if (!player) {
+    return { ok: false, error: "We couldn't find your player record. Contact an admin." };
+  }
+
+  const parsed = playerDetailsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Please check your details." };
+  }
+
+  try {
+    await updatePlayer({ playerId: player.id, ...parsed.data });
+  } catch (error) {
+    return toErrorResult(error);
+  }
+
+  revalidatePath("/profile");
+  return { ok: true, data: { id: player.id } };
 }
 
 /** Creates a Keycloak login for a player who doesn't have one yet (e.g. registered

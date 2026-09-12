@@ -1,5 +1,5 @@
 import { Alert } from "@/components/ui/alert";
-import type { PlayerKeycloakStatus } from "../../server/keycloak-status";
+import type { PlayerKeycloakStatus } from "../server/keycloak-status";
 
 const REQUIRED_ACTION_LABELS: Record<string, string> = {
   VERIFY_EMAIL: "verify their email",

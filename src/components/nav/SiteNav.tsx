@@ -15,16 +15,20 @@ const BASE_NAV_LINKS = [
 export function SiteNav({
   isSignedIn,
   showAdminLink,
+  showProfileLink,
 }: {
   isSignedIn: boolean;
   showAdminLink: boolean;
+  showProfileLink: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  const navLinks = showAdminLink
-    ? [...BASE_NAV_LINKS, { href: "/admin", label: "Admin" }]
-    : BASE_NAV_LINKS;
+  const navLinks = [
+    ...BASE_NAV_LINKS,
+    ...(showProfileLink ? [{ href: "/profile", label: "Profile" }] : []),
+    ...(showAdminLink ? [{ href: "/admin", label: "Admin" }] : []),
+  ];
 
   return (
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">

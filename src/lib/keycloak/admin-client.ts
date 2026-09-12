@@ -26,6 +26,11 @@ async function fetchAdminToken(): Promise<{ value: string; expiresAt: number }> 
       grant_type: "client_credentials",
       client_id: clientId,
       client_secret: clientSecret,
+      // Explicitly request the "roles" scope - without it, Keycloak omits
+      // resource_access (client role mappings, e.g. realm-management's manage-users)
+      // from the token regardless of Full Scope Allowed, and the admin REST API then
+      // sees no permissions at all.
+      scope: "roles",
     }),
   });
 
@@ -68,6 +73,43 @@ async function keycloakAdminFetch(
   }
 
   return response;
+}
+
+export interface KeycloakUserSummary {
+  id: string;
+  email: string | null;
+  enabled: boolean;
+  emailVerified: boolean;
+  requiredActions: string[];
+}
+
+/** Fetches the current state of a Keycloak user directly from Keycloak (there are no
+ *  webhooks, so this is the only way to know whether a player has actually finished
+ *  setting up their account). Returns null if the user no longer exists in Keycloak
+ *  (e.g. it was deleted there after we stored its id). */
+export async function getKeycloakUserById(userId: string): Promise<KeycloakUserSummary | null> {
+  const response = await keycloakAdminFetch(`/users/${userId}`);
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new KeycloakAdminError(`Failed to fetch Keycloak user (${await describeError(response)})`);
+  }
+
+  const user = (await response.json()) as {
+    id: string;
+    email?: string;
+    enabled?: boolean;
+    emailVerified?: boolean;
+    requiredActions?: string[];
+  };
+  return {
+    id: user.id,
+    email: user.email ?? null,
+    enabled: user.enabled ?? false,
+    emailVerified: user.emailVerified ?? false,
+    requiredActions: user.requiredActions ?? [],
+  };
 }
 
 export async function findKeycloakUserByEmail(email: string): Promise<{ id: string } | null> {

@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getPlayerById } from "@/features/players/server/player-repository";
+import { getPlayerKeycloakStatus } from "@/features/players/server/keycloak-status";
 import { CreatePlayerLoginButton } from "@/features/players/ui/admin/CreatePlayerLoginButton";
+import { PlayerKeycloakStatus } from "@/features/players/ui/admin/PlayerKeycloakStatus";
 import { POSITION_LABELS, STICK_SIDE_LABELS } from "@/features/players/constants";
 
 export default async function PlayerDetailPage({
@@ -17,6 +19,8 @@ export default async function PlayerDetailPage({
   if (!player) {
     notFound();
   }
+
+  const keycloakStatus = await getPlayerKeycloakStatus(player.keycloakId);
 
   return (
     <div className="space-y-6">
@@ -34,6 +38,8 @@ export default async function PlayerDetailPage({
           />
         </div>
       </div>
+
+      <PlayerKeycloakStatus status={keycloakStatus} />
 
       <Card>
         <dl className="grid grid-cols-2 gap-4 text-sm">

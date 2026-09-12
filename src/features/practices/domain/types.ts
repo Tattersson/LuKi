@@ -25,9 +25,20 @@ export interface Practice {
   updatedAt: Date;
 }
 
+export interface RsvpNameEntry {
+  playerId: string;
+  /** "Lastname F." - see features/players/format.ts's playerDisplayName. */
+  displayName: string;
+}
+
+export interface RsvpBucket {
+  in: RsvpNameEntry[];
+  out: RsvpNameEntry[];
+}
+
 export interface RsvpSummary {
-  goalkeepers: { in: number; out: number };
-  players: { in: number; out: number };
+  goalkeepers: RsvpBucket;
+  players: RsvpBucket;
 }
 
 export interface RsvpData {
@@ -36,7 +47,7 @@ export interface RsvpData {
 }
 
 export const EMPTY_RSVP_DATA: RsvpData = {
-  summary: { goalkeepers: { in: 0, out: 0 }, players: { in: 0, out: 0 } },
+  summary: { goalkeepers: { in: [], out: [] }, players: { in: [], out: [] } },
   myStatus: null,
 };
 

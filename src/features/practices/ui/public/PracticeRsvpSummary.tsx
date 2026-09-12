@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { upsertRsvpAction } from "../../server/actions";
-import type { RsvpStatus, RsvpSummary } from "../../domain/types";
+import type { RsvpBucket, RsvpStatus, RsvpSummary } from "../../domain/types";
 
 export function PracticeRsvpSummary({
   practiceId,
@@ -37,13 +37,9 @@ export function PracticeRsvpSummary({
   }
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
-      <span>
-        Goalies IN: {summary.goalkeepers.in} · OUT: {summary.goalkeepers.out}
-      </span>
-      <span>
-        Players IN: {summary.players.in} · OUT: {summary.players.out}
-      </span>
+    <div className="mt-2 flex flex-col gap-1 text-xs text-neutral-500">
+      <RsvpBucketLine label="Goalies" bucket={summary.goalkeepers} />
+      <RsvpBucketLine label="Players" bucket={summary.players} />
 
       {canRsvp ? (
         <div className="flex items-center gap-1">
@@ -76,6 +72,22 @@ export function PracticeRsvpSummary({
       )}
 
       {error && <span className="text-red-600 dark:text-red-400">{error}</span>}
+    </div>
+  );
+}
+
+function RsvpBucketLine({ label, bucket }: { label: string; bucket: RsvpBucket }) {
+  return (
+    <div className="flex flex-wrap gap-x-1">
+      <span className="font-medium text-neutral-600 dark:text-neutral-400">{label}:</span>
+      <span>
+        IN ({bucket.in.length}){bucket.in.length > 0 && `: ${bucket.in.map((p) => p.displayName).join(", ")}`}
+      </span>
+      <span>·</span>
+      <span>
+        OUT ({bucket.out.length})
+        {bucket.out.length > 0 && `: ${bucket.out.map((p) => p.displayName).join(", ")}`}
+      </span>
     </div>
   );
 }

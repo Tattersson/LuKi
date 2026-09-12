@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { playerDisplayName } from "@/features/players/format";
 import { PracticeNotFoundError } from "../domain/errors";
 import type { RsvpStatus, RsvpSummary } from "../domain/types";
 
@@ -10,18 +11,22 @@ import type { RsvpStatus, RsvpSummary } from "../domain/types";
 export async function getRsvpSummary(practiceId: string): Promise<RsvpSummary> {
   const rows = await prisma.practiceRsvp.findMany({
     where: { practiceId },
-    select: { status: true, player: { select: { position: true } } },
+    select: {
+      status: true,
+      player: { select: { id: true, firstName: true, lastName: true, position: true } },
+    },
+    orderBy: [{ player: { lastName: "asc" } }, { player: { firstName: "asc" } }],
   });
 
   const summary: RsvpSummary = {
-    goalkeepers: { in: 0, out: 0 },
-    players: { in: 0, out: 0 },
+    goalkeepers: { in: [], out: [] },
+    players: { in: [], out: [] },
   };
 
   for (const row of rows) {
     const bucket = row.player.position === "MV" ? summary.goalkeepers : summary.players;
-    if (row.status === "IN") bucket.in += 1;
-    else bucket.out += 1;
+    const list = row.status === "IN" ? bucket.in : bucket.out;
+    list.push({ playerId: row.player.id, displayName: playerDisplayName(row.player) });
   }
 
   return summary;

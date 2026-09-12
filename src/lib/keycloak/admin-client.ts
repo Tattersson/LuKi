@@ -1,6 +1,13 @@
 import { getKeycloakAdminBaseUrl, getKeycloakTokenUrl } from "./config";
 import { KeycloakAdminError } from "./errors";
 
+/** Keycloak error responses are small JSON bodies (e.g. {"error":"...","error_description":"..."})
+ *  - surfacing them is the difference between "403" and knowing which permission is missing. */
+async function describeError(response: Response): Promise<string> {
+  const text = await response.text().catch(() => "");
+  return text ? `${response.status}: ${text}` : `${response.status}`;
+}
+
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
 async function fetchAdminToken(): Promise<{ value: string; expiresAt: number }> {
@@ -23,7 +30,7 @@ async function fetchAdminToken(): Promise<{ value: string; expiresAt: number }> 
   });
 
   if (!response.ok) {
-    throw new KeycloakAdminError(`Failed to obtain a Keycloak admin token (${response.status})`);
+    throw new KeycloakAdminError(`Failed to obtain a Keycloak admin token (${await describeError(response)})`);
   }
 
   const body = (await response.json()) as { access_token: string; expires_in: number };
@@ -68,7 +75,7 @@ export async function findKeycloakUserByEmail(email: string): Promise<{ id: stri
     `/users?email=${encodeURIComponent(email)}&exact=true`,
   );
   if (!response.ok) {
-    throw new KeycloakAdminError(`Failed to look up Keycloak user by email (${response.status})`);
+    throw new KeycloakAdminError(`Failed to look up Keycloak user by email (${await describeError(response)})`);
   }
   const users = (await response.json()) as Array<{ id: string }>;
   return users[0] ?? null;
@@ -111,7 +118,7 @@ export async function createKeycloakUser(params: {
     }
   }
 
-  throw new KeycloakAdminError(`Failed to create Keycloak user (${response.status})`);
+  throw new KeycloakAdminError(`Failed to create Keycloak user (${await describeError(response)})`);
 }
 
 /** Idempotent - re-assigning an already-mapped role is a no-op in Keycloak. */
@@ -119,7 +126,7 @@ export async function assignRealmRole(userId: string, roleName: string): Promise
   const roleResponse = await keycloakAdminFetch(`/roles/${encodeURIComponent(roleName)}`);
   if (!roleResponse.ok) {
     throw new KeycloakAdminError(
-      `Failed to look up Keycloak realm role "${roleName}" (${roleResponse.status})`,
+      `Failed to look up Keycloak realm role "${roleName}" (${await describeError(roleResponse)})`,
     );
   }
   const role = (await roleResponse.json()) as { id: string; name: string };
@@ -130,7 +137,7 @@ export async function assignRealmRole(userId: string, roleName: string): Promise
   });
   if (!assignResponse.ok) {
     throw new KeycloakAdminError(
-      `Failed to assign Keycloak realm role "${roleName}" (${assignResponse.status})`,
+      `Failed to assign Keycloak realm role "${roleName}" (${await describeError(assignResponse)})`,
     );
   }
 }
@@ -146,6 +153,8 @@ export async function sendExecuteActionsEmail(
     body: JSON.stringify(actions),
   });
   if (!response.ok) {
-    throw new KeycloakAdminError(`Failed to send the Keycloak execute-actions email (${response.status})`);
+    throw new KeycloakAdminError(
+      `Failed to send the Keycloak execute-actions email (${await describeError(response)})`,
+    );
   }
 }

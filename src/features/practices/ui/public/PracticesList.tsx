@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import Link from "next/link";
 import { TEAM_COLORS } from "@/features/games/constants";
 import { toLocalDisplayDate } from "../../domain/datetime";
 import { practiceEventTitle } from "../../format";
@@ -58,7 +59,9 @@ function PracticeRow({
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <span className="font-bold">{practiceEventTitle(practice)}</span>
+            <Link href={`/practices/${practice.id}`} className="font-bold hover:underline">
+              {practiceEventTitle(practice)}
+            </Link>
             <span className="text-sm text-neutral-500">
               {format(start, "EEE d MMM yyyy")} · {format(start, "HH:mm")}–{format(end, "HH:mm")}
             </span>

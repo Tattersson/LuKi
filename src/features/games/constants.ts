@@ -16,7 +16,7 @@ export const GAME_DETAIL_POLL_INTERVAL_MS = 5_000;
 
 export const TEAMS: Record<TeamKey, { teamId: number; subSerieId: number; label: string }> = {
   "luki-2div": { teamId: 1211191406, subSerieId: 201, label: "LuKi II.Div" },
-  "luki-team": { teamId: 1368630285, subSerieId: 4751, label: "Luvian Kiekko Team" },
+  "luki-team": { teamId: 1368630285, subSerieId: 4751, label: "LuKi III.Div" },
 };
 
 /** Hockey seasons run Aug-May and are labelled by the later calendar year, e.g. the

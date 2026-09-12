@@ -12,6 +12,10 @@ export async function getPlayerById(id: string) {
   return prisma.player.findUnique({ where: { id } });
 }
 
+export async function countPlayers(): Promise<number> {
+  return prisma.player.count();
+}
+
 /** Admin correction of a player's own details. Email is never editable here - it's
  *  only ever set once, via self-service verification. */
 export async function updatePlayer(params: {

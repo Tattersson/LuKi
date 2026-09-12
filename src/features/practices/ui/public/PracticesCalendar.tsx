@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { format, getDay, parse, startOfWeek } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Calendar, dateFnsLocalizer, type EventPropGetter } from "react-big-calendar";
@@ -93,6 +94,9 @@ export function PracticesCalendar({
               summary={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).summary}
               myStatus={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).myStatus}
             />
+            <Link href={`/practices/${selected.id}`} className="text-sm font-medium hover:underline">
+              View full details →
+            </Link>
           </div>
         )}
       </Modal>

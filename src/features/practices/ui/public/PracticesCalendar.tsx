@@ -10,7 +10,7 @@ import { Modal } from "@/components/ui/modal";
 import { TEAM_COLORS } from "@/features/games/constants";
 import { toLocalDisplayDate } from "../../domain/datetime";
 import { practiceEventTitle } from "../../format";
-import type { Practice } from "../../domain/types";
+import { EMPTY_RSVP_DATA, type Practice, type RsvpData } from "../../domain/types";
 import { PracticeRsvpSummary } from "./PracticeRsvpSummary";
 
 const localizer = dateFnsLocalizer({
@@ -41,7 +41,15 @@ const eventPropGetter: EventPropGetter<PracticeEvent> = ({ practice }) => ({
   className: TEAM_COLORS[practice.teamKey].event,
 });
 
-export function PracticesCalendar({ practices }: { practices: Practice[] }) {
+export function PracticesCalendar({
+  practices,
+  canRsvp,
+  rsvpByPracticeId,
+}: {
+  practices: Practice[];
+  canRsvp: boolean;
+  rsvpByPracticeId: Record<string, RsvpData>;
+}) {
   const events = practices.map(toEvent);
   // See GamesCalendar.tsx's note: react-big-calendar's Calendar is "uncontrollable"
   // unless both `date` and `onNavigate` are supplied.
@@ -79,7 +87,12 @@ export function PracticesCalendar({ practices }: { practices: Practice[] }) {
             {selected.description && (
               <p className="text-neutral-600 dark:text-neutral-400">{selected.description}</p>
             )}
-            <PracticeRsvpSummary />
+            <PracticeRsvpSummary
+              practiceId={selected.id}
+              canRsvp={canRsvp}
+              summary={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).summary}
+              myStatus={(rsvpByPracticeId[selected.id] ?? EMPTY_RSVP_DATA).myStatus}
+            />
           </div>
         )}
       </Modal>

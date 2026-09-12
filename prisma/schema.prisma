@@ -164,6 +164,10 @@ model Player {
   emailVerifiedAt DateTime
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  /// Keycloak user id ("sub"), set once a login has been provisioned (auto on
+  /// self-registration, or via the admin "Create login" backfill action). Null for
+  /// players who registered before this existed or whose provisioning hasn't run yet.
+  keycloakId      String?        @unique
 
   rsvps PracticeRsvp[]
 }

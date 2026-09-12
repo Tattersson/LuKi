@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/prisma";
-import type { RsvpSummary } from "../domain/types";
+import { PracticeNotFoundError } from "../domain/errors";
+import type { RsvpStatus, RsvpSummary } from "../domain/types";
 
 /**
  * Read side only for now - built ahead of the write path (which needs member login,
@@ -24,4 +25,37 @@ export async function getRsvpSummary(practiceId: string): Promise<RsvpSummary> {
   }
 
   return summary;
+}
+
+export async function getRsvpForPlayer(
+  practiceId: string,
+  playerId: string,
+): Promise<RsvpStatus | null> {
+  const row = await prisma.practiceRsvp.findUnique({
+    where: { practiceId_playerId: { practiceId, playerId } },
+    select: { status: true },
+  });
+  return row?.status ?? null;
+}
+
+/** Rejects RSVPs on a cancelled practice; otherwise creates or updates the player's
+ *  RSVP for it. */
+export async function upsertRsvp(params: {
+  practiceId: string;
+  playerId: string;
+  status: RsvpStatus;
+}): Promise<void> {
+  const practice = await prisma.practice.findUnique({
+    where: { id: params.practiceId },
+    select: { status: true },
+  });
+  if (!practice || practice.status === "CANCELLED") {
+    throw new PracticeNotFoundError();
+  }
+
+  await prisma.practiceRsvp.upsert({
+    where: { practiceId_playerId: { practiceId: params.practiceId, playerId: params.playerId } },
+    create: params,
+    update: { status: params.status },
+  });
 }

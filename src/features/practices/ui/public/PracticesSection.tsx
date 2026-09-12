@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { TEAM_COLORS, TEAMS } from "@/features/games/constants";
 import type { TeamKey } from "@/features/games/domain/types";
-import type { Practice } from "../../domain/types";
+import type { Practice, RsvpData } from "../../domain/types";
 import { PracticesCalendar } from "./PracticesCalendar";
 import { PracticesList } from "./PracticesList";
 
@@ -22,7 +22,15 @@ function icsUrl(teamFilter: TeamFilter, protocol: "https:" | "webcal:"): string 
   return `${protocol}//${url.host}${url.pathname}${url.search}`;
 }
 
-export function PracticesSection({ practices }: { practices: Practice[] }) {
+export function PracticesSection({
+  practices,
+  canRsvp,
+  rsvpByPracticeId,
+}: {
+  practices: Practice[];
+  canRsvp: boolean;
+  rsvpByPracticeId: Record<string, RsvpData>;
+}) {
   const [view, setView] = useState<View>("list");
   const [teamFilter, setTeamFilter] = useState<TeamFilter>("all");
   const [subscribeOpen, setSubscribeOpen] = useState(false);
@@ -101,9 +109,17 @@ export function PracticesSection({ practices }: { practices: Practice[] }) {
       </div>
 
       {view === "list" ? (
-        <PracticesList practices={filteredPractices} />
+        <PracticesList
+          practices={filteredPractices}
+          canRsvp={canRsvp}
+          rsvpByPracticeId={rsvpByPracticeId}
+        />
       ) : (
-        <PracticesCalendar practices={filteredPractices} />
+        <PracticesCalendar
+          practices={filteredPractices}
+          canRsvp={canRsvp}
+          rsvpByPracticeId={rsvpByPracticeId}
+        />
       )}
 
       <Modal

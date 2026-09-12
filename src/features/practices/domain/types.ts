@@ -30,6 +30,16 @@ export interface RsvpSummary {
   players: { in: number; out: number };
 }
 
+export interface RsvpData {
+  summary: RsvpSummary;
+  myStatus: RsvpStatus | null;
+}
+
+export const EMPTY_RSVP_DATA: RsvpData = {
+  summary: { goalkeepers: { in: 0, out: 0 }, players: { in: 0, out: 0 } },
+  myStatus: null,
+};
+
 export interface LocationSuggestion {
   label: string;
   lat: number;

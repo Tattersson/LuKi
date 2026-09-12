@@ -35,3 +35,8 @@ export const updatePracticeSchema = occurrenceFieldsSchema
     message: "End time must be after the start time",
     path: ["endAt"],
   });
+
+export const upsertRsvpSchema = z.object({
+  practiceId: z.string().min(1),
+  status: z.enum(["IN", "OUT"]),
+});

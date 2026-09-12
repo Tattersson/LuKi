@@ -41,6 +41,9 @@ export const authConfig: NextAuthConfig = {
     },
     session({ session, token }) {
       session.user.roles = (token.roles as string[] | undefined) ?? [];
+      if (token.sub) {
+        session.user.id = token.sub;
+      }
       return session;
     },
     // Middleware only gates authentication (must be signed in). Role-based

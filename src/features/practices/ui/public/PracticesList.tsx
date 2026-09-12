@@ -2,10 +2,18 @@ import { format } from "date-fns";
 import { TEAM_COLORS } from "@/features/games/constants";
 import { toLocalDisplayDate } from "../../domain/datetime";
 import { practiceEventTitle } from "../../format";
-import type { Practice } from "../../domain/types";
+import { EMPTY_RSVP_DATA, type Practice, type RsvpData } from "../../domain/types";
 import { PracticeRsvpSummary } from "./PracticeRsvpSummary";
 
-export function PracticesList({ practices }: { practices: Practice[] }) {
+export function PracticesList({
+  practices,
+  canRsvp,
+  rsvpByPracticeId,
+}: {
+  practices: Practice[];
+  canRsvp: boolean;
+  rsvpByPracticeId: Record<string, RsvpData>;
+}) {
   if (practices.length === 0) {
     return <p className="text-sm text-neutral-500">No upcoming practices scheduled.</p>;
   }
@@ -13,13 +21,27 @@ export function PracticesList({ practices }: { practices: Practice[] }) {
   return (
     <ul className="flex flex-col gap-2">
       {practices.map((practice) => (
-        <PracticeRow key={practice.id} practice={practice} />
+        <PracticeRow
+          key={practice.id}
+          practice={practice}
+          canRsvp={canRsvp}
+          rsvpData={rsvpByPracticeId[practice.id]}
+        />
       ))}
     </ul>
   );
 }
 
-function PracticeRow({ practice }: { practice: Practice }) {
+function PracticeRow({
+  practice,
+  canRsvp,
+  rsvpData,
+}: {
+  practice: Practice;
+  canRsvp: boolean;
+  rsvpData: RsvpData | undefined;
+}) {
+  const { summary, myStatus } = rsvpData ?? EMPTY_RSVP_DATA;
   const start = toLocalDisplayDate(practice.startAt);
   const end = toLocalDisplayDate(practice.endAt);
 
@@ -47,7 +69,12 @@ function PracticeRow({ practice }: { practice: Practice }) {
               {practice.description}
             </p>
           )}
-          <PracticeRsvpSummary />
+          <PracticeRsvpSummary
+            practiceId={practice.id}
+            canRsvp={canRsvp}
+            summary={summary}
+            myStatus={myStatus}
+          />
         </div>
       </div>
     </li>

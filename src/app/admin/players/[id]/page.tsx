@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getPlayerById } from "@/features/players/server/player-repository";
+import { CreatePlayerLoginButton } from "@/features/players/ui/admin/CreatePlayerLoginButton";
 import { POSITION_LABELS, STICK_SIDE_LABELS } from "@/features/players/constants";
 
 export default async function PlayerDetailPage({
@@ -23,9 +24,15 @@ export default async function PlayerDetailPage({
         <h1 className="text-2xl font-semibold">
           {player.firstName} {player.lastName}
         </h1>
-        <Link href={`/admin/players/${player.id}/edit`}>
-          <Button variant="secondary">Edit</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href={`/admin/players/${player.id}/edit`}>
+            <Button variant="secondary">Edit</Button>
+          </Link>
+          <CreatePlayerLoginButton
+            playerId={player.id}
+            hasKeycloakAccount={player.keycloakId !== null}
+          />
+        </div>
       </div>
 
       <Card>

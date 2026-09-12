@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { hashEmail, normalizeEmail } from "@/lib/security/email-hash";
 import { EmailAlreadyRegisteredError } from "../domain/errors";
 import { checkOtpInTransaction, sendPlayerOtp, verifyOtpInTransaction } from "./otp-service";
+import { provisionPlayerKeycloakAccount } from "./keycloak-provisioning";
 import type { PlayerPosition, StickSide } from "../domain/types";
 
 /**
@@ -58,18 +59,17 @@ export async function completePlayerRegistration(params: {
   const { email, otpCode, ...details } = params;
   const emailHash = hashEmail(email);
 
-  return prisma.$transaction(async (tx) => {
+  const player = await prisma.$transaction(async (tx) => {
     await verifyOtpInTransaction(tx, { emailHash, otpCode });
 
     try {
-      const player = await tx.player.create({
+      return await tx.player.create({
         data: {
           ...details,
           email: normalizeEmail(email),
           emailVerifiedAt: new Date(),
         },
       });
-      return { id: player.id };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
         throw new EmailAlreadyRegisteredError();
@@ -77,4 +77,15 @@ export async function completePlayerRegistration(params: {
       throw error;
     }
   });
+
+  try {
+    await provisionPlayerKeycloakAccount(player);
+  } catch (error) {
+    // Intentionally swallowed - the player card was created successfully regardless
+    // of Keycloak availability; provisioning is retryable via the admin "Create
+    // login" action.
+    console.error("Keycloak provisioning failed for player", player.id, error);
+  }
+
+  return { id: player.id };
 }

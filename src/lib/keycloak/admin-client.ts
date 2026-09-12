@@ -1,0 +1,151 @@
+import { getKeycloakAdminBaseUrl, getKeycloakTokenUrl } from "./config";
+import { KeycloakAdminError } from "./errors";
+
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function fetchAdminToken(): Promise<{ value: string; expiresAt: number }> {
+  const clientId = process.env.KEYCLOAK_ADMIN_CLIENT_ID;
+  const clientSecret = process.env.KEYCLOAK_ADMIN_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new KeycloakAdminError(
+      "KEYCLOAK_ADMIN_CLIENT_ID/KEYCLOAK_ADMIN_CLIENT_SECRET are not configured",
+    );
+  }
+
+  const response = await fetch(getKeycloakTokenUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new KeycloakAdminError(`Failed to obtain a Keycloak admin token (${response.status})`);
+  }
+
+  const body = (await response.json()) as { access_token: string; expires_in: number };
+  return { value: body.access_token, expiresAt: Date.now() + body.expires_in * 1000 };
+}
+
+/** In-memory cache is per server process - fine here since the app runs as a
+ *  long-lived container, not per-request serverless. */
+async function getAdminToken(): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt - Date.now() > 5_000) {
+    return cachedToken.value;
+  }
+  cachedToken = await fetchAdminToken();
+  return cachedToken.value;
+}
+
+async function keycloakAdminFetch(
+  path: string,
+  init: RequestInit = {},
+  retry = true,
+): Promise<Response> {
+  const token = await getAdminToken();
+  const response = await fetch(`${getKeycloakAdminBaseUrl()}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...init.headers,
+    },
+  });
+
+  if (response.status === 401 && retry) {
+    cachedToken = null;
+    return keycloakAdminFetch(path, init, false);
+  }
+
+  return response;
+}
+
+export async function findKeycloakUserByEmail(email: string): Promise<{ id: string } | null> {
+  const response = await keycloakAdminFetch(
+    `/users?email=${encodeURIComponent(email)}&exact=true`,
+  );
+  if (!response.ok) {
+    throw new KeycloakAdminError(`Failed to look up Keycloak user by email (${response.status})`);
+  }
+  const users = (await response.json()) as Array<{ id: string }>;
+  return users[0] ?? null;
+}
+
+/** Creates the Keycloak user (username = email), required actions get added
+ *  separately via sendExecuteActionsEmail. On a 409 (already exists - e.g. a retry
+ *  after a partially-failed provisioning run), looks the user up instead of failing,
+ *  so callers can treat this as idempotent. */
+export async function createKeycloakUser(params: {
+  email: string;
+  firstName: string;
+  lastName: string;
+}): Promise<{ id: string; alreadyExisted: boolean }> {
+  const response = await keycloakAdminFetch("/users", {
+    method: "POST",
+    body: JSON.stringify({
+      username: params.email,
+      email: params.email,
+      firstName: params.firstName,
+      lastName: params.lastName,
+      enabled: true,
+      emailVerified: false,
+    }),
+  });
+
+  if (response.status === 201) {
+    const location = response.headers.get("Location");
+    const id = location?.split("/").pop();
+    if (!id) {
+      throw new KeycloakAdminError("Keycloak did not return a user id for the created user");
+    }
+    return { id, alreadyExisted: false };
+  }
+
+  if (response.status === 409) {
+    const existing = await findKeycloakUserByEmail(params.email);
+    if (existing) {
+      return { id: existing.id, alreadyExisted: true };
+    }
+  }
+
+  throw new KeycloakAdminError(`Failed to create Keycloak user (${response.status})`);
+}
+
+/** Idempotent - re-assigning an already-mapped role is a no-op in Keycloak. */
+export async function assignRealmRole(userId: string, roleName: string): Promise<void> {
+  const roleResponse = await keycloakAdminFetch(`/roles/${encodeURIComponent(roleName)}`);
+  if (!roleResponse.ok) {
+    throw new KeycloakAdminError(
+      `Failed to look up Keycloak realm role "${roleName}" (${roleResponse.status})`,
+    );
+  }
+  const role = (await roleResponse.json()) as { id: string; name: string };
+
+  const assignResponse = await keycloakAdminFetch(`/users/${userId}/role-mappings/realm`, {
+    method: "POST",
+    body: JSON.stringify([{ id: role.id, name: role.name }]),
+  });
+  if (!assignResponse.ok) {
+    throw new KeycloakAdminError(
+      `Failed to assign Keycloak realm role "${roleName}" (${assignResponse.status})`,
+    );
+  }
+}
+
+/** Keycloak sends its own branded email with a secure, time-limited action-token
+ *  link - no custom token/email flow needed on our side. */
+export async function sendExecuteActionsEmail(
+  userId: string,
+  actions: string[] = ["VERIFY_EMAIL", "UPDATE_PASSWORD"],
+): Promise<void> {
+  const response = await keycloakAdminFetch(`/users/${userId}/execute-actions-email`, {
+    method: "PUT",
+    body: JSON.stringify(actions),
+  });
+  if (!response.ok) {
+    throw new KeycloakAdminError(`Failed to send the Keycloak execute-actions email (${response.status})`);
+  }
+}

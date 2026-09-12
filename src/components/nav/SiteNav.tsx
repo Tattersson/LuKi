@@ -4,17 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clsx } from "@/lib/clsx";
+import { signOutAction } from "@/lib/auth/actions";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { href: "/", label: "Home" },
   { href: "/practices", label: "Practices" },
   { href: "/vote", label: "Vote" },
-  { href: "/admin", label: "Admin" },
 ];
 
-export function SiteNav() {
+export function SiteNav({
+  isSignedIn,
+  showAdminLink,
+}: {
+  isSignedIn: boolean;
+  showAdminLink: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+
+  const navLinks = showAdminLink
+    ? [...BASE_NAV_LINKS, { href: "/admin", label: "Admin" }]
+    : BASE_NAV_LINKS;
 
   return (
     <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
@@ -24,9 +34,10 @@ export function SiteNav() {
         </Link>
 
         <nav className="hidden items-center gap-5 sm:flex">
-          {NAV_LINKS.map((link) => (
+          {navLinks.map((link) => (
             <NavLink key={link.href} href={link.href} label={link.label} pathname={pathname} />
           ))}
+          <AuthLink isSignedIn={isSignedIn} />
         </nav>
 
         <button
@@ -43,7 +54,7 @@ export function SiteNav() {
       {open && (
         <nav className="border-t border-neutral-200 px-4 py-2 sm:hidden dark:border-neutral-800">
           <ul className="flex flex-col">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <li key={link.href}>
                 <NavLink
                   href={link.href}
@@ -54,10 +65,50 @@ export function SiteNav() {
                 />
               </li>
             ))}
+            <li>
+              <AuthLink
+                isSignedIn={isSignedIn}
+                className="block rounded-md px-2 py-2"
+                onNavigate={() => setOpen(false)}
+              />
+            </li>
           </ul>
         </nav>
       )}
     </header>
+  );
+}
+
+function AuthLink({
+  isSignedIn,
+  className,
+  onNavigate,
+}: {
+  isSignedIn: boolean;
+  className?: string;
+  onNavigate?: () => void;
+}) {
+  if (isSignedIn) {
+    return (
+      <form action={signOutAction}>
+        <button
+          type="submit"
+          className={clsx("text-sm text-neutral-600 hover:underline dark:text-neutral-300", className)}
+        >
+          Logout
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <Link
+      href="/api/auth/signin"
+      onClick={onNavigate}
+      className={clsx("text-sm text-neutral-600 hover:underline dark:text-neutral-300", className)}
+    >
+      Login
+    </Link>
   );
 }
 

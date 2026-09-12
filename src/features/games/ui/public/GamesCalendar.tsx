@@ -5,7 +5,8 @@ import { format, getDay, parse, parseISO, startOfWeek } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Calendar, dateFnsLocalizer, type EventPropGetter } from "react-big-calendar";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import { OVERLAP_COLOR, TEAM_COLORS } from "../../constants";
+import "./GamesCalendar.css";
+import { ASSUMED_GAME_DURATION_MINUTES, OVERLAP_COLOR, TEAM_COLORS } from "../../constants";
 import type { TeamGame } from "../../domain/types";
 
 const localizer = dateFnsLocalizer({
@@ -15,8 +16,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales: { "en-US": enUS },
 });
-
-const ASSUMED_GAME_DURATION_MINUTES = 120;
 
 interface GameEvent {
   game: TeamGame;
@@ -51,7 +50,7 @@ export function GamesCalendar({ games }: { games: TeamGame[] }) {
   const [date, setDate] = useState(new Date());
 
   return (
-    <div className="h-150 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white">
+    <div className="luki-calendar h-125 rounded-lg border border-neutral-200 bg-white p-2 text-neutral-900 sm:h-150 dark:border-neutral-800 dark:bg-neutral-900 dark:text-white">
       <Calendar
         localizer={localizer}
         events={events}

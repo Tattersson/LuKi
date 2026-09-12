@@ -6,6 +6,10 @@ export const ROSTERS_BASE_URL = "https://tulospalvelu.leijonat.fi/game/helpers/g
 
 /** Front-page games list ticker (score/period summary only). */
 export const LIVE_POLL_INTERVAL_MS = 30_000;
+
+/** The feed gives a start time but never an end time - both the calendar view and the
+ *  ICS export assume this fixed length so events have a sensible DTEND/end time. */
+export const ASSUMED_GAME_DURATION_MINUTES = 120;
 /** Game detail page (full log/stats) - polled more often since it's the focused view
  *  someone opens specifically to follow a game closely. */
 export const GAME_DETAIL_POLL_INTERVAL_MS = 5_000;

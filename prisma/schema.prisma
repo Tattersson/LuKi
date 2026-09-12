@@ -39,17 +39,17 @@ model Election {
 
   /// Round 1 unless this election is a tie-breaker round, in which case it's the
   /// parent's round + 1 (see tie-breaker-service.ts). Capped by MAX_TIE_BREAKER_ROUNDS.
-  round Int @default(1)
+  round              Int           @default(1)
   /// Null for a normal election. Set on a tie-breaker round to the single position
   /// it exists to decide - see tieBreakerSlots for how many seats are still open.
   tieBreakerPosition VotePosition?
   /// Null for a normal election. On a tie-breaker round, how many winner slots for
   /// tieBreakerPosition are still undecided and up for a re-vote among its candidates.
-  tieBreakerSlots Int?
+  tieBreakerSlots    Int?
 
   parentElectionId String?
-  parentElection    Election?  @relation("TieBreakerRounds", fields: [parentElectionId], references: [id], onDelete: Cascade)
-  childElections    Election[] @relation("TieBreakerRounds")
+  parentElection   Election?  @relation("TieBreakerRounds", fields: [parentElectionId], references: [id], onDelete: Cascade)
+  childElections   Election[] @relation("TieBreakerRounds")
 
   candidates  Candidate[]
   votedEmails VotedEmail[]
@@ -164,6 +164,68 @@ model Player {
   emailVerifiedAt DateTime
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+
+  rsvps PracticeRsvp[]
+}
+
+enum PracticeStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+/// One row per practice occurrence. A recurring practice materializes N rows sharing
+/// a seriesId at creation time (not a single RRULE row) so each occurrence can be
+/// edited or cancelled independently, and so the ICS feed's UID/SEQUENCE work per
+/// occurrence - see the `practices` feature's domain/ics.ts.
+model Practice {
+  id           String         @id @default(cuid())
+  /// Matches games' TeamKey ("luki-2div" | "luki-team") - see features/games/constants.ts.
+  teamKey      String
+  /// Optional override; the public UI derives a default title from the team label
+  /// when this is blank.
+  title        String?
+  startAt      DateTime
+  endAt        DateTime
+  locationName String
+  locationLat  Float?
+  locationLng  Float?
+  description  String?
+  /// Shared by every occurrence generated from one recurring create; null for a
+  /// one-off practice.
+  seriesId     String?
+  status       PracticeStatus @default(SCHEDULED)
+  /// Bumped on every edit; drives the ICS feed's SEQUENCE so subscribed calendars
+  /// treat an edited occurrence as updated rather than a duplicate. Games hardcodes
+  /// SEQUENCE:0 because games are never edited locally - practices are, so that
+  /// shortcut doesn't apply here.
+  version      Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  rsvps PracticeRsvp[]
+
+  @@index([teamKey, startAt])
+  @@index([seriesId])
+}
+
+enum RsvpStatus {
+  IN
+  OUT
+}
+
+/// Schema and read side only for now - there is no write path until member login
+/// (Keycloak) lands, see the `practices` feature's rsvp-repository.ts.
+model PracticeRsvp {
+  id         String     @id @default(cuid())
+  practiceId String
+  practice   Practice   @relation(fields: [practiceId], references: [id], onDelete: Cascade)
+  playerId   String
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  status     RsvpStatus
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([practiceId, playerId])
 }
 
 /// Standalone email-verification OTP for self-service player registration. Unlike

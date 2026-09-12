@@ -28,6 +28,9 @@ export default async function AdminLayout({
             <Link href="/admin/players" className="text-sm text-neutral-500 hover:underline">
               Players
             </Link>
+            <Link href="/admin/practices" className="text-sm text-neutral-500 hover:underline">
+              Practices
+            </Link>
           </div>
           <div className="flex items-center gap-3 text-sm text-neutral-500">
             <span>{session.user?.email}</span>

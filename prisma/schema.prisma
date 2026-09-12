@@ -153,8 +153,11 @@ model Player {
   firstName       String
   lastName        String
   position        PlayerPosition
-  heightCm        Int
-  weightKg        Int
+  /// Optional - can be filled in later (self-reported now, may be synced from the
+  /// Finnish Hockey Association API in the future).
+  heightCm        Int?
+  /// Optional - see heightCm.
+  weightKg        Int?
   stickSide       StickSide
   birthDate       DateTime
   email           String         @unique

@@ -52,6 +52,21 @@ describe("completePlayerRegistrationSchema", () => {
     expect(result.success).toBe(false);
   });
 
+  it("treats height and weight as optional - blank string, null, and omitted are all accepted as 'not provided'", () => {
+    for (const heightCm of ["", null, undefined]) {
+      const result = completePlayerRegistrationSchema.safeParse({
+        ...validDetails,
+        heightCm,
+        weightKg: "",
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.heightCm).toBeNull();
+        expect(result.data.weightKg).toBeNull();
+      }
+    }
+  });
+
   it("rejects an invalid position", () => {
     const result = completePlayerRegistrationSchema.safeParse({
       ...validDetails,

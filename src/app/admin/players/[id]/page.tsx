@@ -40,11 +40,11 @@ export default async function PlayerDetailPage({
           </div>
           <div>
             <dt className="text-neutral-500">Height</dt>
-            <dd>{player.heightCm} cm</dd>
+            <dd>{player.heightCm !== null ? `${player.heightCm} cm` : "Not provided"}</dd>
           </div>
           <div>
             <dt className="text-neutral-500">Weight</dt>
-            <dd>{player.weightKg} kg</dd>
+            <dd>{player.weightKg !== null ? `${player.weightKg} kg` : "Not provided"}</dd>
           </div>
           <div>
             <dt className="text-neutral-500">Birthdate</dt>

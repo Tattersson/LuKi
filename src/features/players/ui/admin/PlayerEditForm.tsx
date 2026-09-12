@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { POSITION_LABELS, STICK_SIDE_LABELS } from "../../constants";
 import { updatePlayerAction } from "../../server/actions";
+import { OptionalBadge } from "../OptionalBadge";
 import type { PlayerPosition, StickSide } from "../../domain/types";
 
 export interface PlayerEditFormInitialData {
@@ -15,8 +16,8 @@ export interface PlayerEditFormInitialData {
   firstName: string;
   lastName: string;
   position: PlayerPosition;
-  heightCm: number;
-  weightKg: number;
+  heightCm: number | null;
+  weightKg: number | null;
   stickSide: StickSide;
   birthDate: Date;
 }
@@ -31,8 +32,8 @@ export function PlayerEditForm({ player }: { player: PlayerEditFormInitialData }
   const [firstName, setFirstName] = useState(player.firstName);
   const [lastName, setLastName] = useState(player.lastName);
   const [position, setPosition] = useState<PlayerPosition>(player.position);
-  const [heightCm, setHeightCm] = useState(String(player.heightCm));
-  const [weightKg, setWeightKg] = useState(String(player.weightKg));
+  const [heightCm, setHeightCm] = useState(player.heightCm !== null ? String(player.heightCm) : "");
+  const [weightKg, setWeightKg] = useState(player.weightKg !== null ? String(player.weightKg) : "");
   const [stickSide, setStickSide] = useState<StickSide>(player.stickSide);
   const [birthDate, setBirthDate] = useState(toDateInputValue(player.birthDate));
   const [pending, setPending] = useState(false);
@@ -128,11 +129,11 @@ export function PlayerEditForm({ player }: { player: PlayerEditFormInitialData }
         <div>
           <label htmlFor="heightCm" className="mb-1 block text-sm font-medium">
             Height (cm)
+            <OptionalBadge />
           </label>
           <Input
             id="heightCm"
             type="number"
-            required
             inputMode="numeric"
             value={heightCm}
             onChange={(e) => setHeightCm(e.target.value)}
@@ -141,11 +142,11 @@ export function PlayerEditForm({ player }: { player: PlayerEditFormInitialData }
         <div>
           <label htmlFor="weightKg" className="mb-1 block text-sm font-medium">
             Weight (kg)
+            <OptionalBadge />
           </label>
           <Input
             id="weightKg"
             type="number"
-            required
             inputMode="numeric"
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}

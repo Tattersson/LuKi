@@ -6,8 +6,8 @@ export interface PlayerSummary {
   firstName: string;
   lastName: string;
   position: PlayerPosition;
-  heightCm: number;
-  weightKg: number;
+  heightCm: number | null;
+  weightKg: number | null;
   stickSide: StickSide;
   birthDate: Date;
   email: string;

@@ -14,12 +14,21 @@ const birthDateSchema = z.coerce
   .date()
   .refine((date) => date.getTime() < Date.now(), "Birthdate must be in the past");
 
+/** Blank ("", null, undefined) means "not provided yet" and is stored as NULL - a
+ *  present value still has to fall within the sane bounds. */
+function optionalMeasurement(min: number, max: number) {
+  return z.preprocess(
+    (val) => (val === "" || val === null || val === undefined ? null : val),
+    z.coerce.number().int().min(min).max(max).nullable(),
+  );
+}
+
 const playerDetailsSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
   position: z.enum(["MV", "FW", "D"]),
-  heightCm: z.coerce.number().int().min(MIN_HEIGHT_CM).max(MAX_HEIGHT_CM),
-  weightKg: z.coerce.number().int().min(MIN_WEIGHT_KG).max(MAX_WEIGHT_KG),
+  heightCm: optionalMeasurement(MIN_HEIGHT_CM, MAX_HEIGHT_CM),
+  weightKg: optionalMeasurement(MIN_WEIGHT_KG, MAX_WEIGHT_KG),
   stickSide: z.enum(["LEFT", "RIGHT"]),
   birthDate: birthDateSchema,
 });

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { POSITION_LABELS, STICK_SIDE_LABELS } from "../../constants";
+import { OptionalBadge } from "../OptionalBadge";
 import type { PlayerPosition, StickSide } from "../../domain/types";
 
 export interface PlayerDetailsInput {
@@ -110,11 +111,11 @@ export function PlayerDetailsStep({
         <div>
           <label htmlFor="heightCm" className="mb-1 block text-sm font-medium">
             Height (cm)
+            <OptionalBadge />
           </label>
           <Input
             id="heightCm"
             type="number"
-            required
             inputMode="numeric"
             value={heightCm}
             onChange={(e) => setHeightCm(e.target.value)}
@@ -123,17 +124,20 @@ export function PlayerDetailsStep({
         <div>
           <label htmlFor="weightKg" className="mb-1 block text-sm font-medium">
             Weight (kg)
+            <OptionalBadge />
           </label>
           <Input
             id="weightKg"
             type="number"
-            required
             inputMode="numeric"
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value)}
           />
         </div>
       </div>
+      <p className="-mt-2 text-xs text-neutral-500">
+        Don&apos;t know these yet? Leave them blank - they can be added later.
+      </p>
 
       <div>
         <label htmlFor="birthDate" className="mb-1 block text-sm font-medium">

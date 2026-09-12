@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Player" ALTER COLUMN "heightCm" DROP NOT NULL,
+ALTER COLUMN "weightKg" DROP NOT NULL;
